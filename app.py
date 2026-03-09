@@ -1,32 +1,65 @@
-# --- 4. OUTPUT: INPUT VALIDATION & UNIVERSE CALCULATION ---
-if calculate:
-    universe_val, matched_col = get_universe_value(sel_market, sel_gender, sel_age, sel_nccs)
-    
-    st.subheader("✅ Part 1: Data Architecture Verification")
-    
-    # --- FIXED LOGIC: Handle NaN or Missing Data ---
-    if pd.isna(universe_val) or universe_val == 0:
-        display_universe = "Data Not Available"
-        st.error(f"⚠️ The combination of {sel_age} and NCCS {sel_nccs} does not exist in the BARC records for {sel_market}. Please try a broader NCCS or Age group.")
-    else:
-        # Only convert to int if it's a valid number
-        display_universe = f"{int(universe_val):,} ('000s)"
+import streamlit as st
+import pandas as pd
+import numpy as np
 
-    # Display the breakdown
-    c1, c2, c3, c4 = st.columns(4)
-    c1.info(f"**Market:** \n {sel_market}")
-    c2.info(f"**Targeting:** \n {sel_gender} | {sel_age} | NCCS {sel_nccs}")
+# --- 1. DATA ENGINE: LOADING & STRUCTURING BARC DATA ---
+@st.cache_data
+def load_barc_data():
+    # Load the table data from the CSV conversion of your excel
+    try:
+        df = pd.read_csv('barc_data.xlsx.xlsx - Table.csv')
+        
+        # Set headers correctly (First row contains the labels)
+        header = df.iloc[0].values
+        df = df[1:].copy()
+        df.columns = header
+        
+        # Rename first column to 'Region' for clarity
+        df = df.rename(columns={df.columns[0]: 'Region'})
+        
+        # Clean data: convert 'n.a' strings to NaN and ensure numeric types
+        df = df.replace('n.a', np.nan)
+        for col in df.columns[1:]:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        return df.dropna(subset=['Region'])
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return None
+
+df_media = load_barc_data()
+
+# --- 2. MAPPING ENGINE: MULTI-DIMENSIONAL SEARCH ---
+def get_universe_value(region, gender, age, nccs):
+    """
+    Maps user selections to the specific BARC column naming conventions.
+    """
+    g_map = {"Male": "M", "Female": "F", "Both": "MF"}
     
-    # Using the safe display string
-    c3.success(f"**Universe identified:** \n {display_universe}")
-    c4.warning(f"**Data Source Mapping:** \n Column: '{matched_col}'")
+    # Logic: Attempt to construct the column name based on file patterns
+    # Pattern: [Gender] [Age] [NCCS] -> e.g., "F 22-30 A"
+    target_col = f"{g_map[gender]} {age} {nccs}"
     
-    # --- Audit Table ---
-    st.write("### Data Integrity Check")
-    audit_status = "Verified" if not pd.isna(universe_val) else "Missing in Source"
-    audit_data = {
-        "Parameter": ["Market", "Gender", "Age", "NCCS", "Budget", "Reach Goal"],
-        "Selection": [sel_market, sel_gender, sel_age, sel_nccs, f"₹{budget:,}", f"{reach_target}%"],
-        "Status": [audit_status, "Mapped", "Mapped", "Mapped", "Valid", "Valid"]
-    }
-    st.table(pd.DataFrame(audit_data))
+    # Fallback Logic: If the specific cut is not in the Excel, try broader segments
+    if target_col not in df_media.columns:
+        if nccs == "A" and age == "All" and gender == "Both":
+            target_col = "A"
+        elif age != "All" and gender == "Both" and nccs == "All":
+            target_col = age
+        elif gender != "Both" and age == "All" and nccs == "All":
+            target_col = "Male" if gender == "Male" else "Female"
+        else:
+            # Defaults to NCCS selection if no gender/age cross-section exists
+            target_col = nccs if nccs in df_media.columns else "Universe"
+            
+    try:
+        val = df_media[df_media['Region'] == region][target_col].values[0]
+        return val, target_col
+    except:
+        return np.nan, "Not Found"
+
+# --- 3. UI: THE RESTRUCTURED INPUT TASKBAR ---
+st.set_page_config(page_title="Virtual Media Planner", layout="wide")
+
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🌐 Virtual Media Planner</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-
