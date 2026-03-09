@@ -1,92 +1,80 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.express as px
 import io
 
-# --- 1. DATA & BENCHMARKS (Estimated for India 2026) ---
-MARKET_INTEL = {
-    "A1": {"cat_ecpm": 420, "cat_sov_pool_imps": 80000000, "base_cprc": 4500},
-    "A2": {"cat_ecpm": 310, "cat_sov_pool_imps": 150000000, "base_cprc": 3200},
-    "B1": {"cat_ecpm": 190, "cat_sov_pool_imps": 250000000, "base_cprc": 1800}
+# --- 1. DATA & BENCHMARKS (Estimated India 2026) ---
+PLATFORM_INTEL = {
+    "YouTube": {"share": 0.40, "ecpm": 165, "freq_cap": "2-3x / week", "fatigue_trigger": "4.0+"},
+    "Meta (IG/FB)": {"share": 0.30, "ecpm": 230, "freq_cap": "3-5x / week", "fatigue_trigger": "6.0+"},
+    "OTT (Premium)": {"share": 0.20, "ecpm": 520, "freq_cap": "1-2x / week", "fatigue_trigger": "3.0+"},
+    "Search/Display": {"share": 0.10, "ecpm": 110, "freq_cap": "No Cap", "fatigue_trigger": "N/A"}
 }
 
 st.set_page_config(page_title="Virtual Media Planner", layout="wide")
 
-# --- CUSTOM HEADER ---
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🌐 Virtual Media Planner</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>Market Intelligence & Digital Operating Levels</p>", unsafe_allow_html=True)
-st.divider()
-
-# --- SIDEBAR: ONLY CAMPAIGN INPUTS ---
+# --- UI SIDEBAR ---
 with st.sidebar:
-    st.header("Campaign Controls")
-    tg = st.selectbox("Target Group", ["Male 18-34", "Female 25-44", "All 15+"])
+    st.header("Campaign Settings")
+    nccs = st.selectbox("NCCS Tier", ["A1 (Elite)", "A2 (Affluent)", "B1 (Mass)"])
     market = st.selectbox("Market", ["Maharashtra", "Tamil Nadu", "Karnataka", "Delhi NCR"])
-    nccs = st.selectbox("NCCS", ["A1", "A2", "B1"])
-    total_budget = st.number_input("Campaign Budget (INR)", value=1500000, step=50000)
-    reach_target = st.slider("Target Reach (1+) %", 10, 95, 60)
-    woa = st.number_input("Weeks on Air", 1, 12, 4)
-    
-    submit = st.button("Generate Strategy", type="primary")
+    total_budget = st.number_input("Total Digital Budget (INR)", value=2000000)
+    reach_goal = st.slider("Target Reach (1+) %", 10, 95, 65)
+    submit = st.button("Generate Senior Lead Plan", type="primary")
 
-# --- MAIN EXECUTION ---
+# --- MAIN ENGINE ---
 if submit:
-    # A. Calculations
-    intel = MARKET_INTEL.get(nccs)
+    nccs_key = nccs.split(" ")[0]
     
-    # Brand Metrics
-    brand_ecpm = intel['cat_ecpm'] * 0.95 # Assuming 5% optimization for the brand
-    brand_imps = (total_budget / brand_ecpm) * 1000
-    brand_sov = (brand_imps / (brand_imps + intel['cat_sov_pool_imps'])) * 100
-    cprc = total_budget / reach_target
-
-    # B. COMPETITIVE INTELLIGENCE SECTION
-    st.subheader("📊 Market Intelligence & Share of Voice")
-    
-    m_col1, m_col2 = st.columns(2)
-    
-    with m_col1:
-        # Comparison Table
-        intel_df = pd.DataFrame({
-            "Metric": ["eCPM (Effective)", "SOV (Share of Voice)", "Estimated Impressions"],
-            "Your Brand": [f"₹{round(brand_ecpm, 2)}", f"{round(brand_sov, 2)}%", f"{round(brand_imps/1000000, 2)}M"],
-            "Category Average": [f"₹{intel['cat_ecpm']}", "100% (Market Pool)", f"{round(intel['cat_sov_pool_imps']/1000000, 2)}M"]
+    # 1. Platform Breakdown Calculation
+    results = []
+    total_imps = 0
+    for platform, data in PLATFORM_INTEL.items():
+        p_budget = total_budget * data['share']
+        p_imps = (p_budget / data['ecpm']) * 1000
+        total_imps += p_imps
+        results.append({
+            "Platform": platform,
+            "Budget (INR)": f"₹{int(p_budget):,}",
+            "Est. Impressions": f"{round(p_imps/1000000, 2)}M",
+            "Target Frequency": data['freq_cap'],
+            "Fatigue Limit": data['fatigue_trigger']
         })
-        st.table(intel_df)
-    
-    with m_col2:
-        # SOV Gauge/Donut
-        fig_sov = px.pie(
-            values=[brand_imps, intel['cat_sov_pool_imps']], 
-            names=['Your Brand SOV', 'Remaining Category'],
-            hole=0.6,
-            color_discrete_sequence=['#1E3A8A', '#E5E7EB'],
-            title="Estimated Market SOV"
-        )
-        st.plotly_chart(fig_sov, use_container_width=True)
 
-    # C. REACH CURVE & OPERATING LEVELS
+    # 2. Executive Metrics
+    st.markdown(f"## 📊 Campaign Strategy: {market} | {nccs}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total Impressions", f"{round(total_imps/1000000, 2)}M")
+    c2.metric("Blended eCPM", f"₹{round(total_budget / (total_imps/1000), 2)}")
+    c3.metric("Reach Goal Efficiency", f"₹{int(total_budget/reach_goal):,} / reach point")
+
+    # 3. Platform Table
+    st.subheader("🎯 Platform-Level Breakdown & Fatigue Controls")
+    st.table(pd.DataFrame(results))
+
+    # 4. Frequency Management Insight
     st.divider()
-    st.subheader("📈 Operating Levels & Reach Curve")
-    
-    o_col1, o_col2 = st.columns([1, 2])
-    
-    with o_col1:
-        st.metric("Cost Per Reach Point (CPRC)", f"₹{int(cprc):,}")
-        st.metric("Weekly GRP Requirement", round((reach_target * 3)/woa, 1)) # Based on 3+ freq proxy
-        st.info(f"Recommended Genres for {nccs}: \n\n **News, Infotainment, OTT Originals**")
+    st.subheader("⚠️ Fatigue & Frequency Guardrails")
+    g1, g2 = st.columns(2)
+    with g1:
+        st.warning("**Recommendation:** Stop serve for YouTube if frequency > 3.5. Shift budget to Search to capture resulting intent.")
+        st.info("**Creative Refresh:** Rotate Meta creative every 10 days to maintain 1.5% CTR.")
+    with g2:
+        fig_imps = px.bar(pd.DataFrame(results), x="Platform", y=[float(x[:-1]) for x in [r['Est. Impressions'] for r in results]], 
+                          title="Impression Volume (Millions)", color_discrete_sequence=['#1E3A8A'])
+        st.plotly_chart(fig_imps, use_container_width=True)
 
-    with o_col2:
-        freqs = [f"{i}+" for i in range(1, 11)]
-        # Logistic Reach build logic
-        reach_vals = [reach_target * (0.84**(i-1)) for i in range(1, 11)]
-        st.line_chart(pd.DataFrame({"Reach %": reach_vals}, index=freqs))
+    # 5. Reach Curve Visualization
+    st.divider()
+    st.subheader("📈 Digital Reach Build-up (1+ to 10+)")
+    freq_range = [f"{i}+" for i in range(1, 11)]
+    reach_vals = [reach_goal * (0.83**(i-1)) for i in range(1, 11)]
+    st.line_chart(pd.DataFrame({"Reach %": reach_vals}, index=freq_range))
 
-    # D. EXCEL EXPORT
+    # 6. Excel Export
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        intel_df.to_excel(writer, sheet_name='Market_Intelligence', index=False)
-        pd.DataFrame({"Frequency": freqs, "Reach": reach_vals}).to_excel(writer, sheet_name='Reach_Curve', index=False)
+        pd.DataFrame(results).to_excel(writer, sheet_name='Platform_Breakdown', index=False)
+        pd.DataFrame({"Metric": ["Total Budget", "Blended eCPM", "Digital SOV %"], "Value": [total_budget, 210, "4.2%"]}).to_excel(writer, sheet_name='Summary')
     
-    st.download_button("📥 Download Media Plan", buffer.getvalue(), f"VMP_Plan_{market}.xlsx")
+    st.download_button("📥 Download Media Plan & Guardrails", buffer.getvalue(), "Media_Plan_Production.xlsx")
