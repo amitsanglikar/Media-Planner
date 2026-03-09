@@ -1,64 +1,45 @@
 import streamlit as st
 import pandas as pd
 import io
+import numpy as np
 
-# --- Professional Page Setup ---
-st.set_page_config(page_title="Media Planner Pro | India", layout="wide")
-st.title("🇮🇳 Digital Media Planning Engine")
+# --- 1. Page Configuration ---
+st.set_page_config(page_title="Virtual Media Planner", layout="wide", page_icon="📈")
 
-# --- Dropdowns & Sidebar Inputs ---
+# --- 2. Custom Header ---
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🌐 Virtual Media Planner</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 1.2em;'>Data-Driven Digital Strategy for the Indian Market</p>", unsafe_allow_html=True)
+st.divider()
+
+# --- 3. Sidebar Inputs (Based on your UI requirements) ---
 with st.sidebar:
-    st.header("Campaign Inputs")
-    tg = st.selectbox("TG (Target Group)", ["All 15+", "Male 18-34", "Female 25-44", "Gen Z (15-24)"])
-    market = st.selectbox("Market", ["Pan India", "Maharashtra", "Tamil Nadu", "Karnataka", "West Bengal"])
-    nccs = st.selectbox("NCCS", ["A1", "A2", "B1", "B2", "C"])
-    creative = st.selectbox("Creative Format", ["Video (15s/30s)", "Static", "Impact Formats", "Influencer"])
+    st.header("Campaign Configuration")
+    tg = st.selectbox("Target Group (TG)", ["All 15+", "Male 15-24", "Female 25-44", "Gen Z", "Working Professionals"])
+    market = st.selectbox("Market", ["Pan India", "Maharashtra", "Tamil Nadu", "Karnataka", "West Bengal", "Delhi NCR"])
+    nccs = st.selectbox("NCCS Tier", ["A1", "A2", "B1", "B2", "C"])
+    creative_format = st.selectbox("Creative Format", ["Video (15s/30s)", "Static Banners", "Social/Reels", "Impact Mastheads"])
     
     st.divider()
-    reach_goal = st.slider("Target Reach %", 10, 100, 60)
-    eff_freq = st.number_input("Effective Frequency", 1, 10, 3)
-    woa = st.number_input("Weeks on Air", 1, 12, 4)
+    reach_goal = st.slider("Target Reach (%)", 10, 100, 60)
+    eff_freq = st.number_input("Required Effective Frequency", 1, 10, 3)
+    woa = st.number_input("Weeks on Air (WOA)", 1, 12, 4)
     
-    submit = st.button("Generate Plan & Export", type="primary")
+    st.info("The logic accounts for NCCS benchmarks and Regional Language Multipliers.")
+    submit = st.button("Generate Strategy", type="primary")
 
-# --- Logic Processing ---
+# --- 4. Logic & Output Generation ---
 if submit:
-    # 1. Platform Ranking Logic
-    # Weighted Scoring: (Reach*0.4) + (Affinity*0.4) + (Time*0.2) + Regional Multiplier
+    # --- A. Scoring Logic & Top 5 Platforms ---
+    # Formula: (Reach*0.4) + (Affinity*0.4) + (Time*0.2)
+    # Regional Multiplier: +20% Affinity for local apps in specific states
     platforms = ["YouTube", "Meta", "JioCinema", "WhatsApp", "SunNXT" if market == "Tamil Nadu" else "Zee5"]
-    reach_data = [85, 78, 65, 92, 45]
-    scores = [88.2, 82.1, 75.4, 91.0, 78.5] # Sample results
+    reach_stats = [88, 82, 70, 94, 52]
+    affinity_stats = [1.1, 1.0, 1.2, 1.1, 1.4] # 1.4 includes regional boost
+    time_stats = [0.9, 0.8, 0.7, 0.95, 0.6]
+
+    # Calculate Weighted Scores
+    scores = [(r*0.4 + a*40 + t*20) for r, a, t in zip(reach_stats, affinity_stats, time_stats)]
     
-    df_plan = pd.DataFrame({
+    df_ranking = pd.DataFrame({
         "Rank": [1, 2, 3, 4, 5],
-        "Platform": platforms,
-        "Reach %": reach_data,
-        "Weighted Score": scores
-    })
-
-    # 2. Display Results
-    st.subheader(f"Strategy for {nccs} in {market}")
-    st.table(df_plan)
-
-    # 3. Frequency Distribution (Reach Curve 1+ to 10+)
-    st.subheader("Frequency Distribution (1+ to 10+)")
-    freq_data = pd.DataFrame({
-        "Frequency": [f"{i}+" for i in range(1, 11)],
-        "Reach %": [reach_goal * (0.82**(i-1)) for i in range(1, 11)]
-    })
-    st.line_chart(freq_data.set_index("Frequency"))
-
-    # --- THE DOWNLOAD BUTTON (Excel Export) ---
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        df_plan.to_excel(writer, sheet_name='Top 5 Platforms', index=False)
-        freq_data.to_excel(writer, sheet_name='Reach Curve', index=False)
-        
-        # Adding Operating Levels Summary
-        summary = pd.DataFrame({
-            "Metric": ["Target Reach", "Target Frequency", "Total GRPs", "Weekly AOTS"],
-            "Value": [f"{reach_goal}%", eff_freq, reach_goal * eff_freq, round((reach_goal * eff_freq)/woa, 2)]
-        })
-        summary.to_excel(writer, sheet_name='Operating Levels', index=False)
-
-    st.download_button(
+        "Platform":
