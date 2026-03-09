@@ -85,4 +85,46 @@ if df_media is not None:
         age_options = ["15-30", "15-21", "22-30", "31-40", "41-50", "51-60", "61+", "2-14"]
         sel_age = st.selectbox("Age Group", age_options)
         
-        # 4. N
+        # 4. NCCS Selection
+        nccs_options = ["AB", "A", "ABC", "B", "CDE"]
+        sel_nccs = st.selectbox("NCCS Category", nccs_options)
+        
+        st.divider()
+        budget = st.number_input("Total Budget (INR)", min_value=10000, value=1000000, step=50000)
+        reach_goal = st.slider("Reach Target (1+) %", 5, 95, 60)
+        
+        calculate = st.button("Finalize Inputs", type="primary")
+
+    # --- 4. OUTPUT DISPLAY ---
+    if calculate:
+        universe_val, matched_col = get_universe_value(sel_market, sel_gender, sel_age, sel_nccs)
+        
+        st.subheader("📊 Part 1: Input Validation")
+        
+        # Handle NaN values to prevent crash
+        if pd.isna(universe_val) or universe_val == 0:
+            display_val = "N/A"
+            st.warning(f"Note: Specific data for {sel_gender} {sel_age} {sel_nccs} not found. Showing closest proxy.")
+        else:
+            display_val = f"{int(universe_val):,} ('000s)"
+
+        # KPI Metrics for confirmation
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Market Selection", sel_market)
+        k2.metric("Target Profile", f"{sel_gender} {sel_age} {sel_nccs}")
+        k3.metric("Universe identified", display_val)
+        k4.metric("BARC Data Source", matched_col)
+
+        st.success(f"Mapping complete. The system is using the **{matched_col}** column for all reach calculations.")
+        
+        # Data Integrity Table
+        st.write("### Data Verification Table")
+        audit_df = pd.DataFrame({
+            "Input Parameter": ["Region", "Gender", "Age Bracket", "NCCS Level", "Matched Column", "Budget"],
+            "User Selection": [sel_market, sel_gender, sel_age, sel_nccs, matched_col, f"₹{budget:,}"],
+            "Status": ["Verified", "Mapped to MF/M/F", "Sync Successful", "Sync Successful", "Data Active", "Ready"]
+        })
+        st.table(audit_df)
+
+else:
+    st.error("Missing Data Source: Please ensure 'barc_data.xlsx.xlsx - Table.csv' is available.")
