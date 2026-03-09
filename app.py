@@ -4,126 +4,91 @@ import numpy as np
 import plotly.express as px
 import io
 
-# --- 1. GLOBAL CONFIGURATION & MOCK DATA ---
-# This dictionary simulates the "Synthetic Benchmark" mode
-SYNTHETIC_BENCHMARKS = {
-    "A1": {"reach": 0.85, "affinity": 1.2, "time": 0.9},
-    "A2": {"reach": 0.75, "affinity": 1.0, "time": 0.8},
-    "B1": {"reach": 0.65, "affinity": 0.9, "time": 0.7},
-    "B2": {"reach": 0.55, "affinity": 0.8, "time": 0.6}
+# --- 1. DIGITAL BENCHMARKS (India 2026) ---
+DIGITAL_BENCHMARKS = {
+    "A1": {"avg_cpm": 350, "bench_ctr": 1.2, "bench_vtr": 45},
+    "A2": {"avg_cpm": 280, "bench_ctr": 1.0, "bench_vtr": 35},
+    "B1": {"avg_cpm": 180, "bench_ctr": 0.8, "bench_vtr": 25}
 }
 
-REGIONAL_BOOSTS = {
-    "Tamil Nadu": ["SunNXT", "Aha", "YouTube Tamil"],
-    "West Bengal": ["Hoichoi", "YouTube Bengali"],
-    "Maharashtra": ["Zee5", "YouTube Marathi"]
-}
+st.set_page_config(page_title="Virtual Media Planner", layout="wide")
+st.markdown("<h1 style='text-align: center;'>🌐 Virtual Media Planner</h1>", unsafe_allow_html=True)
 
-# --- 2. PAGE SETUP ---
-st.set_page_config(page_title="Virtual Media Planner", layout="wide", page_icon="📈")
-
-# Header Section
-st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🌐 Virtual Media Planner</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 1.1em; color: #666;'>Senior Digital Media Planning Engine | Indian Market Edition</p>", unsafe_allow_html=True)
-st.divider()
-
-# --- 3. UI SIDEBAR (Input Section) ---
+# --- 2. SIDEBAR INPUTS ---
 with st.sidebar:
-    st.header("Campaign Parameters")
-    tg = st.selectbox("Target Group (TG)", ["All 15+", "Male 18-34", "Female 25-44", "Gen Z (15-24)"])
-    market = st.selectbox("Market", ["Pan India", "Maharashtra", "Tamil Nadu", "Karnataka", "West Bengal"])
-    nccs = st.selectbox("NCCS Tier", ["A1", "A2", "B1", "B2"])
-    creative = st.selectbox("Creative Format", ["Video", "Static", "Social/Influencer", "Impact"])
+    st.header("Campaign & Market Data")
+    nccs = st.selectbox("NCCS Tier", ["A1", "A2", "B1"])
+    market = st.selectbox("Market", ["Maharashtra", "Tamil Nadu", "Karnataka", "Delhi NCR"])
+    total_budget = st.number_input("Your Digital Budget (INR)", value=1000000, min_value=100000)
     
     st.divider()
-    total_budget = st.number_input("Total Budget (INR)", min_value=100000, value=1000000, step=50000)
-    reach_goal = st.slider("Target Reach (%)", 10, 100, 60)
-    eff_freq = st.number_input("Effective Frequency", 1, 10, 3)
-    woa = st.number_input("Weeks on Air", 1, 12, 4)
+    st.header("Competitive & SOV")
+    cat_monthly_imps = st.number_input("Estimated Category Monthly Impressions", value=50000000)
+    avg_cat_cpm = st.number_input("Avg. Category CPM (INR)", value=220)
     
-    submit = st.button("Generate Final Media Plan", type="primary")
+    st.divider()
+    reach_goal = st.slider("Target Reach %", 10, 95, 60)
+    
+    submit = st.button("Generate Digital Plan", type="primary")
 
-# --- 4. CALCULATION & OUTPUT LOGIC ---
+# --- 3. EXECUTION LOGIC ---
 if submit:
-    # A. Platform Scoring Logic
-    base_stats = SYNTHETIC_BENCHMARKS.get(nccs, SYNTHETIC_BENCHMARKS["A2"])
+    # A. Efficiency Calculations
+    bench = DIGITAL_BENCHMARKS.get(nccs)
+    est_impressions = (total_budget / bench['avg_cpm']) * 1000
+    cprc = total_budget / reach_goal  # Cost Per Reach Point
+    sov = (est_impressions / cat_monthly_imps) * 100
     
-    platforms = ["YouTube", "Meta", "WhatsApp", "JioCinema", "Local OTT"]
-    # Dynamic name for local OTT
-    if market == "Tamil Nadu": platforms[-1] = "SunNXT"
-    elif market == "West Bengal": platforms[-1] = "Hoichoi"
-    elif market == "Maharashtra": platforms[-1] = "Zee5"
+    # B. KPI & SOV Dashboard
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Est. Impressions", f"{round(est_impressions/1000000, 2)}M")
+    col2.metric("CPRC (Cost Per Reach Point)", f"₹{int(cprc):,}")
+    col3.metric("Digital SOV", f"{round(sov, 2)}%")
 
-    results = []
-    for p in platforms:
-        p_reach = base_stats["reach"] * np.random.uniform(0.8, 1.1) # Simulate variance
-        p_affinity = base_stats["affinity"]
-        
-        # Apply Regional Boost
-        if market in REGIONAL_BOOSTS and p in REGIONAL_BOOSTS[market]:
-            p_affinity *= 1.2
-            
-        # Formula: (Reach*0.4) + (Affinity*0.4) + (Time*0.2)
-        score = (p_reach * 40) + (p_affinity * 40) + (base_stats["time"] * 20)
-        results.append({"Platform": p, "Reach%": round(p_reach*100, 1), "Score": round(score, 2)})
-
-    df_ranking = pd.DataFrame(results).sort_values(by="Score", ascending=False)
-
-    # B. Layout Columns
-    col1, col2 = st.columns([1, 1])
-
-    with col1:
-        st.subheader("🏆 Top Platform Rankings")
-        st.dataframe(df_ranking, use_container_width=True, hide_index=True)
-        
-        st.subheader("⚙️ Operating Levels")
-        grps = reach_goal * eff_freq
-        st.metric("Total GRPs", f"{grps}")
-        st.metric("Weekly GRP Goal", f"{round(grps/woa, 2)}")
-        st.write(f"**Target AOTS:** {round(eff_freq * 1.3, 1)}")
-
-    with col2:
-        st.subheader("📈 Reach Distribution (1+ to 10+)")
-        freq_indices = [f"{i}+" for i in range(1, 11)]
-        # Logarithmic reach decay simulation
-        reach_vals = [reach_goal * (0.83**(i-1)) for i in range(1, 11)]
-        df_curve = pd.DataFrame({"Frequency": freq_indices, "Reach %": reach_vals})
-        st.line_chart(df_curve.set_index("Frequency"))
-
+    # C. Benchmarking Chart
     st.divider()
-
-    # C. Budget Allocation Section
-    st.subheader("💰 Recommended Budget Allocation")
-    aware_amt, consid_amt, conver_amt = total_budget * 0.5, total_budget * 0.3, total_budget * 0.2
+    st.subheader("📊 Performance Benchmarks vs. Market")
     
-    b_col1, b_col2, b_col3 = st.columns(3)
-    b_col1.metric("Awareness (50%)", f"₹{int(aware_amt):,}")
-    b_col2.metric("Consideration (30%)", f"₹{int(consid_amt):,}")
-    b_col3.metric("Conversion (20%)", f"₹{int(conver_amt):,}")
+    bench_data = pd.DataFrame({
+        "Metric": ["Avg. CPM (INR)", "Expected CTR (%)", "Expected VTR (%)"],
+        "Market Benchmark": [bench['avg_cpm'], bench['bench_ctr'], bench['bench_vtr']],
+        "Your Plan Proxy": [round(total_budget/(est_impressions/1000), 2), bench['bench_ctr'], bench['bench_vtr']]
+    })
+    st.table(bench_data)
 
-    fig = px.pie(
-        values=[aware_amt, consid_amt, conver_amt], 
-        names=['Awareness', 'Consideration', 'Conversion'],
-        hole=0.4,
-        color_discrete_sequence=px.colors.sequential.Blues_r
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    # D. Reach Curve & Operating Levels
+    st.subheader("📈 Reach Distribution Curve (1+ to 10+)")
+    freqs = [f"{i}+" for i in range(1, 11)]
+    # Beta-Binomial approximation for Digital Reach
+    reach_vals = [reach_goal * (0.82**(i-1)) for i in range(1, 11)]
+    fig_curve = px.area(x=freqs, y=reach_vals, labels={'x': 'Frequency', 'y': 'Reach %'},
+                        title="Incremental Reach Decay")
+    st.plotly_chart(fig_curve, use_container_width=True)
 
-    # D. Excel Export
+    # E. Genre Mix & Budget Bifurcation
+    st.divider()
+    st.subheader("🎯 Genre Strategy & Funnel Split")
+    
+    g_col1, g_col2 = st.columns(2)
+    with g_col1:
+        genres = {"A1": "Business, Luxury, Tech, Global News", 
+                  "A2": "Infotainment, Sports, Lifestyle", 
+                  "B1": "Regional GEC, Music, Comedy"}
+        st.write(f"**Recommended Genre Clusters for {nccs}:**")
+        st.success(genres.get(nccs))
+    
+    with g_col2:
+        fig_pie = px.pie(values=[total_budget*0.5, total_budget*0.3, total_budget*0.2], 
+                         names=['Awareness (Video)', 'Consideration (Social)', 'Conversion (Search/WA)'],
+                         hole=0.4, title="Budget Bifurcation")
+        st.plotly_chart(fig_pie)
+
+    # F. Excel Export
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        df_ranking.to_excel(writer, sheet_name='Rankings', index=False)
-        df_curve.to_excel(writer, sheet_name='Reach_Curve', index=False)
-        pd.DataFrame({
-            "Metric": ["TG", "Market", "NCCS", "Total Budget", "Weekly GRPs"],
-            "Value": [tg, market, nccs, total_budget, round(grps/woa, 2)]
-        }).to_excel(writer, sheet_name='Summary', index=False)
+        df_summary = pd.DataFrame({"Metric": ["Budget", "Reach %", "CPRC", "SOV %"], 
+                                   "Value": [total_budget, reach_goal, cprc, sov]})
+        df_summary.to_excel(writer, sheet_name='Executive_Summary', index=False)
+        bench_data.to_excel(writer, sheet_name='Benchmarks', index=False)
 
-    st.download_button(
-        label="📥 Download Plan as Excel",
-        data=buffer.getvalue(),
-        file_name=f"VMP_Plan_{market}.xlsx",
-        mime="application/vnd.ms-excel"
-    )
-
-    st.success("Strategy Orchestrated Successfully!")
+    st.download_button("📥 Download Digital Media Plan", buffer.getvalue(), f"Digital_Plan_{market}.xlsx")
