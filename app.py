@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 
 # --- 1. PAGE CONFIG ---
-st.set_page_config(page_title="Virtual Media Planner", layout="wide", page_icon="🌐")
+st.set_page_config(page_title="Virtual Media Planner", layout="wide")
 
 # --- 2. THE "MOCK-FAITHFUL" CSS OVERRIDE ---
 st.markdown("""
@@ -19,13 +19,11 @@ st.markdown("""
         background-color: var(--bg-color) !important;
     }
 
-    /* Force all text elements to the Navy Blue from the mock */
-    label, .stMarkdown, p, h1, h2, h3, h4, h5, [data-testid="stWidgetLabel"] p {
+    label, .stMarkdown, p, h1, h2, h3, h5, [data-testid="stWidgetLabel"] p {
         color: #1E3A8A !important;
         font-family: 'Inter', sans-serif !important;
     }
 
-    /* The White Box Container for inputs */
     .filter-section {
         background-color: #FFFFFF !important;
         padding: 30px !important;
@@ -35,14 +33,12 @@ st.markdown("""
         margin-bottom: 25px !important;
     }
 
-    /* Widget Backgrounds */
     div[data-baseweb="select"] > div, div[data-baseweb="input"] > div {
         background-color: #F1F5F9 !important;
         color: #1E293B !important;
         border: 1px solid #CBD5E1 !important;
     }
 
-    /* Professional Metric Cards */
     .kpi-card {
         background-color: white !important;
         padding: 20px !important;
@@ -52,27 +48,20 @@ st.markdown("""
         margin-bottom: 15px !important;
     }
 
-    /* Action Button (Coral/Red) */
     .stButton>button {
         background-color: #FF4B4B !important;
         color: white !important;
         border: none !important;
         border-radius: 8px !important;
-        height: 50px !important;
+        height: 45px !important;
         width: 100% !important;
         font-weight: bold !important;
-        margin-top: 25px !important;
-        transition: 0.3s ease;
-    }
-    
-    .stButton>button:hover {
-        background-color: #E03E3E !important;
-        box-shadow: 0 4px 12px rgba(255, 75, 75, 0.3) !important;
+        margin-top: 15px !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATA ENGINE: MARKET MASTER ---
+# --- 3. THE SOURCE: INDUSTRY BENCHMARK DATA (Master Data) ---
 MARKET_MASTER = {
     "India (Total)": {"base": 1400000, "internet_pen": 0.55},
     "Mumbai": {"base": 21000, "internet_pen": 0.85},
@@ -86,8 +75,22 @@ MARKET_MASTER = {
 }
 
 def calculate_universe(market, gender, age, nccs):
+    # Lookup market base
     data = MARKET_MASTER.get(market, {"base": 50000, "internet_pen": 0.50})
     base_digital = data['base'] * data['internet_pen']
     
+    # Weightage Logic
     g_w = 0.50 if gender != "Both" else 1.0
-    a_map = {"15-30": 0.45, "15-21": 0.18, "22-30": 0.27, "31-40": 0.20, "41-5
+    
+    # Age weightage
+    a_map = {
+        "15-30": 0.45, 
+        "15-21": 0.18, 
+        "22-30": 0.27, 
+        "31-40": 0.20, 
+        "41-50": 0.15, 
+        "2-14": 0.20
+    }
+    a_w = a_map.get(age, 1.0)
+    
+    # N
