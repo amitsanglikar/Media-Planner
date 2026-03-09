@@ -1,139 +1,109 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
 
-# --- 1. PAGE CONFIG ---
-st.set_page_config(page_title="Media Planner Pro", layout="wide", page_icon="📈")
+# --- 1. CONFIG & DATA ---
+st.set_page_config(page_title="Pro Digital Planner 2026", layout="wide")
 
-# --- 2. THE "ULTIMATE" UI CSS ---
+# Industry Benchmarks (IAMAI 2025/2026)
+TOTAL_DIGITAL_UNIVERSE = 958000 # '000s (958 Million)
+
+# State & District Hierarchy (Sample Mapping)
+GEOGRAPHY = {
+    "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Nashik", "Aurangabad", "Thane", "Solapur"],
+    "Delhi NCR": ["Central Delhi", "North Delhi", "South Delhi", "Gurgaon", "Noida", "Ghaziabad"],
+    "Karnataka": ["Bangalore Urban", "Bangalore Rural", "Mysore", "Hubli-Dharwad", "Belgaum"],
+    "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Salem", "Tiruchirappalli"],
+    "Uttar Pradesh": ["Lucknow", "Kanpur", "Varanasi", "Agra", "Meerut", "Prayagraj"],
+    "West Bengal": ["Kolkata", "Howrah", "Durgapur", "Siliguri", "Asansol"],
+    "Gujarat": ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar"]
+}
+
+# --- 2. CSS STYLING ---
 st.markdown("""
     <style>
-    /* Global Reset to Professional Slate */
-    .stApp { background-color: #F8FAFC !important; }
-    
-    /* Header & Typography */
-    h1, h2, h3, h4, p, label, [data-testid="stWidgetLabel"] p {
-        color: #0F172A !important;
-        font-family: 'Inter', -apple-system, sans-serif !important;
+    .stMultiSelect div[data-baseweb="select"] { background-color: white !important; }
+    .kpi-box {
+        background: #ffffff; padding: 20px; border-radius: 10px;
+        border-top: 5px solid #3B82F6; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
-
-    /* The "Command Bar" - High-End Floating Container */
-    .command-bar {
-        background: white;
-        padding: 25px;
-        border-radius: 16px;
-        border: 1px solid #E2E8F0;
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05);
-        margin-bottom: 2rem;
-    }
-
-    /* KPI Cards with Depth */
-    .kpi-card {
-        background: white;
-        padding: 24px;
-        border-radius: 12px;
-        border-top: 6px solid #3B82F6;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        transition: transform 0.2s ease;
-    }
-    .kpi-card:hover { transform: translateY(-3px); }
-
-    /* Custom Button - Corporate Blue */
-    .stButton>button {
-        background: #2563EB !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 8px !important;
-        height: 52px !important;
-        width: 100% !important;
-        font-weight: 700 !important;
-        letter-spacing: 0.5px;
-    }
+    .sidebar-header { color: #1E3A8A; font-weight: bold; font-size: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DYNAMIC DATA SOURCE (Expandable) ---
-BASE_TOTAL = 958000 # '000s
-MARKETS = {"India (Total)": 1.0, "Maharashtra": 0.14, "Delhi NCR": 0.08, "UP": 0.16, "Karnataka": 0.07}
-AGES = {"15-24": 0.35, "25-34": 0.30, "35-44": 0.20, "45+": 0.15}
-
-# --- 4. INTERFACE: TOP COMMAND BAR ---
-st.markdown("<h1>🌐 Virtual Media Planner <span style='font-size:16px; color:#64748B; font-weight:400;'>v3.0 Enterprise</span></h1>", unsafe_allow_html=True)
+# --- 3. UI LAYOUT ---
+st.title("📊 Advanced Media Planner (IAMAI 2026)")
 
 with st.container():
-    st.markdown('<div class="command-bar">', unsafe_allow_html=True)
-    st.markdown("#### 📍 Audience Strategy & Market Selection")
+    st.markdown("### 🌍 Geographic & Demographic Filters")
+    col1, col2, col3 = st.columns(3)
     
-    # Grid for scalability
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: market = st.selectbox("Geography", list(MARKETS.keys()))
-    with c2: gender = st.selectbox("Gender Bias", ["Both", "Male", "Female"])
-    with c3: age = st.selectbox("Age Cohort", list(AGES.keys()))
-    with c4: nccs = st.selectbox("NCCS Grade", ["A", "AB", "ABC", "CDE"])
-
-    c5, c6, c7 = st.columns([2, 2, 1.2])
-    with c5: budget = st.number_input("Campaign Budget (INR)", 1000000, step=100000)
-    with c6: reach = st.slider("Reach Target %", 10, 95, 60)
-    with c7: 
-        st.write("##") # Alignment
-        run = st.button("CALCULATE PLAN")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# --- 5. INTERFACE: ANALYTICS DASHBOARD ---
-if run:
-    # Calculation Logic
-    m_weight = MARKETS[market]
-    reg_val = BASE_TOTAL * m_weight
-    g_weight = 0.54 if gender == "Male" else (0.46 if gender == "Female" else 1.0)
-    a_weight = AGES[age]
-    n_weight = {"A": 0.18, "AB": 0.38, "ABC": 0.58, "CDE": 0.42}[nccs]
+    with col1:
+        sel_states = st.multiselect("Select States", list(GEOGRAPHY.keys()), default=["Maharashtra"])
+        # Urban/Rural Split
+        geo_type = st.radio("Market Type", ["Overall", "Urban Only", "Rural Only"], horizontal=True)
     
-    final_universe = int(reg_val * g_weight * a_weight * n_weight)
-
-    # Layout: Analytics Grid
-    col_vis, col_strat = st.columns([1, 1.2])
-
-    with col_vis:
-        st.markdown("#### 🔍 Audience Funnel Analysis")
+    with col2:
+        # Get districts for all selected states
+        available_districts = []
+        for s in sel_states:
+            available_districts.extend(GEOGRAPHY[s])
         
-        # Plotly Funnel for UX
-        fig = go.Figure(go.Funnel(
-            y = ["Total Digital", "Market Base", "Target Segment"],
-            x = [BASE_TOTAL, reg_val, final_universe],
-            textinfo = "value+percent initial",
-            marker = {"color": ["#0F172A", "#3B82F6", "#60A5FA"]}
-        ))
-        fig.update_layout(height=350, margin=dict(l=10, r=10, t=10, b=10), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col_strat:
-        st.markdown("#### 🎯 Core Metrics")
+        sel_districts = st.multiselect("Select Districts", sorted(list(set(available_districts))))
+        sel_gender = st.multiselect("Gender", ["Male", "Female"], default=["Male", "Female"])
         
-        # KPI Card 1
+    with col3:
+        sel_age = st.multiselect("Age Groups", ["15-24", "25-34", "35-44", "45+"], default=["15-24", "25-34"])
+        sel_nccs = st.multiselect("NCCS", ["A", "B", "C", "D", "E"], default=["A", "B"])
+
+# --- 4. CALCULATION ENGINE ---
+def run_planner():
+    # 1. Base Weight by State (Approximate Digital Share)
+    state_weights = {"Maharashtra": 0.14, "Delhi NCR": 0.09, "Karnataka": 0.08, "Tamil Nadu": 0.09, "Uttar Pradesh": 0.16, "West Bengal": 0.08, "Gujarat": 0.07}
+    
+    total_weight = sum([state_weights.get(s, 0.05) for s in sel_states])
+    base_u = TOTAL_DIGITAL_UNIVERSE * total_weight
+    
+    # 2. Urban/Rural Adjust (IAMAI 2025: 43% Urban / 57% Rural)
+    if geo_type == "Urban Only": base_u *= 0.43
+    elif geo_type == "Rural Only": base_u *= 0.57
+    
+    # 3. Demographic Weights
+    # Age Split
+    age_map = {"15-24": 0.35, "25-34": 0.30, "35-44": 0.20, "45+": 0.15}
+    age_w = sum([age_map.get(a, 0) for a in sel_age])
+    
+    # NCCS Split
+    nccs_map = {"A": 0.15, "B": 0.20, "C": 0.25, "D": 0.20, "E": 0.20}
+    nccs_w = sum([nccs_map.get(n, 0) for n in sel_nccs])
+    
+    # Gender (IAMAI: 54% M / 46% F)
+    gender_w = 0
+    if "Male" in sel_gender: gender_w += 0.54
+    if "Female" in sel_gender: gender_w += 0.46
+    
+    # Final Calculation
+    final_universe = int(base_u * age_w * nccs_w * gender_w)
+    return final_universe
+
+# --- 5. RESULTS DISPLAY ---
+if st.button("Calculate Plan", type="primary"):
+    universe = run_planner()
+    
+    
+
+    res_col1, res_col2 = st.columns(2)
+    
+    with res_col1:
         st.markdown(f"""
-            <div class="kpi-card">
-                <p style="margin:0; font-size:14px; color:#64748B !important;">Target Digital Universe</p>
-                <h1 style="margin:0; font-size:44px; color:#2563EB !important;">{final_universe:,}</h1>
-                <p style="margin:0; font-size:12px;">Active Users ('000s) | IAMAI Benchmarks</p>
-            </div>
+        <div class="kpi-box">
+            <p style="color:gray; margin:0;">Target Universe Size</p>
+            <h1 style="color:#1E3A8A; margin:0;">{universe:,}</h1>
+            <p style="font-size:12px;">Active Monthly Users (in '000s)</p>
+        </div>
         """, unsafe_allow_html=True)
 
-        # KPI Card 2 - Platform Split (Visual Simulation)
-        st.markdown("#### 📊 Recommended Media Mix")
-        mix_data = pd.DataFrame({
-            "Channel": ["YouTube", "Meta", "Google Search", "Programmatic"],
-            "Allocation": [40, 30, 20, 10]
-        })
-        st.bar_chart(mix_data, x="Channel", y="Allocation", color="#3B82F6")
-
-    # Data Integrity Table
-    st.markdown("---")
-    st.markdown("#### 🛡️ Data Source Integrity Audit")
-    audit_df = pd.DataFrame({
-        "Parameter": ["Region", "Gender", "Age", "NCCS", "Budget"],
-        "Value": [market, gender, age, nccs, f"₹{budget:,}"],
-        "Source": ["IAMAI 2025", "Comscore", "Census Weight", "Proxy SEC", "User Input"],
-        "Sync": ["OK ✅", "OK ✅", "OK ✅", "OK ✅", "Live ⚡"]
-    })
-    st.table(audit_df)
+    with res_col2:
+        st.markdown("### 📊 Audience Split")
+        # Quick bar chart of Age distribution
+        age_data = pd.DataFrame({"Age": sel_age, "Weight": [35, 30, 20, 15][:len(sel_age)]})
+        st.bar_chart(age_data.set_index("Age"))
