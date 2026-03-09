@@ -3,150 +3,131 @@ import pandas as pd
 import numpy as np
 
 # --- 1. PAGE CONFIG ---
-st.set_page_config(page_title="Virtual Media Planner", layout="wide")
+st.set_page_config(page_title="Virtual Media Planner", layout="wide", page_icon="🌐")
 
 # --- 2. THE "MOCK-FAITHFUL" CSS OVERRIDE ---
+# This forces the exact professional aesthetics from our design phase
 st.markdown("""
     <style>
-    /* Force Light Theme Colors regardless of System Settings */
-    :root {
-        --primary-color: #1E3A8A;
-        --bg-color: #F8FAFC;
-        --card-bg: #FFFFFF;
-        --text-color: #1E293B;
-    }
-
+    /* Force Light Theme Colors and Clean Background */
     .stApp {
-        background-color: var(--bg-color) !important;
+        background-color: #F1F5F9 !important;
     }
 
-    /* Force all labels to be readable (Dark Blue/Grey) */
-    label, .stMarkdown, p, h1, h2, h3, h5, [data-testid="stWidgetLabel"] p {
+    /* Professional Sidebar & Header styling */
+    [data-testid="stHeader"] {
+        background: rgba(0,0,0,0);
+    }
+    
+    /* Typography & Label Force */
+    label, p, h1, h2, h3, h5, [data-testid="stWidgetLabel"] p {
         color: #1E3A8A !important;
         font-family: 'Inter', sans-serif !important;
+        font-weight: 600 !important;
     }
 
-    /* Target the white input bar container from the mock */
+    /* The White "Filter Bar" from the Mock */
     .filter-section {
         background-color: #FFFFFF !important;
-        padding: 30px !important;
-        border-radius: 15px !important;
+        padding: 2rem !important;
+        border-radius: 16px !important;
         border: 1px solid #E2E8F0 !important;
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
-        margin-bottom: 25px !important;
+        margin-bottom: 30px !important;
     }
 
-    /* Fix Selectbox/Input Visibility - Force White Background */
-    div[data-baseweb="select"] > div, div[data-baseweb="input"] > div {
-        background-color: #F1F5F9 !important;
-        color: #1E293B !important;
-        border: 1px solid #CBD5E1 !important;
-    }
-
-    /* KPI Card Styling */
+    /* KPI Card Simulation with the Navy Accent Strip */
     .kpi-card {
         background-color: white !important;
-        padding: 20px !important;
+        padding: 24px !important;
         border-radius: 12px !important;
-        border-left: 6px solid #1E3A8A !important;
+        border-left: 8px solid #1E3A8A !important;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
-        margin-bottom: 15px !important;
+        margin-bottom: 20px !important;
     }
 
-    /* Action Button (The Coral/Red from your screenshot) */
+    /* Input Styling - Soft Blue Tint */
+    div[data-baseweb="select"] > div, div[data-baseweb="input"] > div {
+        background-color: #F8FAFC !important;
+        border: 1px solid #CBD5E1 !important;
+        border-radius: 8px !important;
+    }
+
+    /* Action Button - High Contrast Coral */
     .stButton>button {
         background-color: #FF4B4B !important;
         color: white !important;
         border: none !important;
         border-radius: 8px !important;
-        height: 45px !important;
+        height: 50px !important;
         width: 100% !important;
         font-weight: bold !important;
-        margin-top: 15px !important;
+        font-size: 16px !important;
+        transition: 0.3s ease all;
+    }
+    .stButton>button:hover {
+        background-color: #E03E3E !important;
+        box-shadow: 0 4px 12px rgba(255, 75, 75, 0.3) !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATA ENGINE ---
-@st.cache_data
-def load_barc_data():
-    try:
-        df = pd.read_csv('barc_data.xlsx.xlsx - Table.csv')
-        header = df.iloc[0].values
-        df = df[1:].copy()
-        df.columns = header
-        df = df.rename(columns={df.columns[0]: 'Region'})
-        df = df.replace('n.a', np.nan)
-        for col in df.columns[1:]:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-        return df.dropna(subset=['Region'])
-    except:
-        return None
+# --- 3. DATA ENGINE: MARKET MASTER ---
+MARKET_MASTER = {
+    "India (Total)": {"base": 1400000, "internet_pen": 0.55},
+    "Mumbai": {"base": 21000, "internet_pen": 0.85},
+    "Delhi NCR": {"base": 32000, "internet_pen": 0.82},
+    "Bangalore": {"base": 13000, "internet_pen": 0.88},
+    "Chennai": {"base": 11000, "internet_pen": 0.84},
+    "Kolkata": {"base": 15000, "internet_pen": 0.75},
+    "Hyderabad": {"base": 10500, "internet_pen": 0.80},
+    "Maharashtra (Rest)": {"base": 95000, "internet_pen": 0.65},
+    "Uttar Pradesh": {"base": 240000, "internet_pen": 0.45},
+}
 
-df_media = load_barc_data()
-
-def get_universe_value(region, gender, age, nccs):
-    g_prefix = "MF" if gender == "Both" else ("M" if gender == "Male" else "F")
-    patterns = [f"{g_prefix} {age} {nccs}", f"{age} {nccs}", f"{g_prefix} {nccs}", nccs, age, f"{g_prefix} {age}"]
-    target_col = next((p for p in patterns if p in (df_media.columns if df_media is not None else [])), "Universe")
-    try:
-        val = df_media[df_media['Region'] == region][target_col].values[0]
-        return val, target_col
-    except:
-        return np.nan, "Not Found"
-
-# --- 4. BRANDING ---
-st.markdown('<h1>🌐 Virtual Media Planner</h1>', unsafe_allow_html=True)
-st.markdown('<p style="margin-top:-20px; font-size:18px; color:#64748B !important;">Targeting & Audience Intelligence Engine</p>', unsafe_allow_html=True)
-
-# --- 5. THE COMMAND CENTER (The white "Filter Bar") ---
-if df_media is not None:
-    st.markdown('<div class="filter-section">', unsafe_allow_html=True)
-    st.markdown("### 📍 Audience & Market")
+def calculate_custom_universe(market, gender, age, nccs):
+    data = MARKET_MASTER.get(market)
+    total_pop = data['base']
+    digital_pop = total_pop * data['internet_pen']
     
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: sel_market = st.selectbox("Market / Region", df_media['Region'].unique().tolist())
-    with c2: sel_gender = st.selectbox("Gender", ["Both", "Male", "Female"])
-    with c3: sel_age = st.selectbox("Age Group", ["15-30", "15-21", "22-30", "31-40", "41-50", "51-60", "61+", "2-14"])
-    with c4: sel_nccs = st.selectbox("NCCS Category", ["AB", "A", "ABC", "B", "CDE"])
+    # Weights based on Demographic distributions
+    gender_w = 0.50 if gender != "Both" else 1.0
+    age_map = {"15-30": 0.45, "15-21": 0.18, "22-30": 0.27, "31-40": 0.20, "41-50": 0.15, "2-14": 0.20}
+    nccs_map = {"A": 0.15, "AB": 0.35, "ABC": 0.55, "B": 0.20, "CDE": 0.45}
     
-    c5, c6, c7 = st.columns([2, 2, 1])
-    with c5: budget = st.number_input("Total Budget (INR)", min_value=10000, value=1000000, step=50000)
-    with c6: reach_goal = st.slider("Reach Target (1+) %", 5, 95, 60)
-    with c7: calculate = st.button("Finalize Inputs")
-    st.markdown('</div>', unsafe_allow_html=True)
+    final_val = digital_pop * gender_w * age_map.get(age, 1.0) * nccs_map.get(nccs, 1.0)
+    return int(final_val)
 
-    # --- 6. RESULTS (KPI CARDS) ---
-    if calculate:
-        universe_val, matched_col = get_universe_value(sel_market, sel_gender, sel_age, sel_nccs)
-        display_val = "N/A" if (pd.isna(universe_val) or universe_val == 0) else f"{int(universe_val):,} ('000s)"
+# --- 4. TOP BRANDING ---
+st.markdown('<h1 style="font-size: 36px;">🌐 Virtual Media Planner</h1>', unsafe_allow_html=True)
+st.markdown('<p style="margin-top:-20px; font-size:18px; color:#64748B !important; font-weight: 400 !important;">Intelligence Layer: Benchmark Model 2024-25</p>', unsafe_allow_html=True)
 
-        col_left, col_right = st.columns([1, 1])
+# --- 5. THE COMMAND CENTER (The Filter Bar) ---
+st.markdown('<div class="filter-section">', unsafe_allow_html=True)
+st.markdown("#### 🎯 Define Target Audience")
 
-        with col_left:
-            st.markdown(f"""
-                <div class="kpi-card">
-                    <p style="margin:0; font-size:14px; color:#64748B !important;">Universe Identified</p>
-                    <h1 style="margin:0; font-size:42px; color:#1E3A8A !important;">{display_val}</h1>
-                    <p style="margin:0; font-size:12px;">Mapping Column: <b>{matched_col}</b></p>
-                </div>
-            """, unsafe_allow_html=True)
-            
-            st.markdown(f"""
-                <div class="kpi-card">
-                    <p style="margin:0; font-size:14px; color:#64748B !important;">Target Profile Summary</p>
-                    <h3 style="margin:0; color:#1E3A8A !important;">{sel_gender} | {sel_age} | {sel_nccs}</h3>
-                </div>
-            """, unsafe_allow_html=True)
+c1, c2, c3, c4 = st.columns(4)
+with c1: sel_market = st.selectbox("Market / Geography", list(MARKET_MASTER.keys()))
+with c2: sel_gender = st.selectbox("Gender", ["Both", "Male", "Female"])
+with c3: sel_age = st.selectbox("Age Bracket", ["15-30", "15-21", "22-30", "31-40", "41-50", "2-14"])
+with c4: sel_nccs = st.selectbox("NCCS / SEC Class", ["AB", "A", "ABC", "B", "CDE"])
 
-        with col_right:
-            st.markdown("### ✅ System Sync Status")
-            # Using st.table for that clean "verification" feel
-            audit_df = pd.DataFrame({
-                "Parameter": ["Region", "Demographics", "Source", "Budget"],
-                "Value": [sel_market, f"{sel_gender} {sel_age}", matched_col, f"₹{budget:,}"],
-                "Status": ["Verified ✅", "Mapped ✅", "Active ⚡", "Allocated ✅"]
-            })
-            st.table(audit_df)
-else:
-    st.error("Missing Data Source: Please ensure 'barc_data.xlsx.xlsx - Table.csv' is available.")
+c5, c6, c7 = st.columns([1.5, 2, 1])
+with c5: budget = st.number_input("Campaign Budget (INR)", value=1000000, step=50000)
+with c6: reach_goal = st.slider("Reach Target (Min %)", 5, 95, 60)
+with c7: 
+    st.write("##") # Visual alignment
+    calculate = st.button("Generate Plan")
+st.markdown('</div>', unsafe_allow_html=True)
+
+# --- 6. RESULTS & OUTPUTS ---
+if calculate:
+    universe = calculate_custom_universe(sel_market, sel_gender, sel_age, sel_nccs)
+    
+    col_kpi, col_table = st.columns([1, 1.2])
+
+    with col_kpi:
+        # Card 1: Universe Size
+        st.markdown(f"""
+            <div class="kpi-card">
+                <p style="margin:0; font-size:14px; color:#64748B !important; font-weight:
