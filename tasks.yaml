@@ -1,1 +1,14 @@
+tasks:
+  sizing_and_ranking:
+    description: >
+      Using {tg}, {market}, and {nccs}, pull reach data from BARC Excel. 
+      Calculate scores for Top 5 Genres and Platforms.
+    agent: demographics_auditor
+    expected_output: "Dataframe with Rank, Reach%, Affinity, and Score."
 
+  funnel_and_curve_optimization:
+    description: >
+      Create a 1+ to 10+ reach curve and map the top 5 platforms to 
+      Awareness, Consideration, and Conversion based on {creative}.
+    agent: media_strategist
+    expected_output: "Reach curve data points and a 3-stage funnel map."
