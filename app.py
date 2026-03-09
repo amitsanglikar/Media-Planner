@@ -4,91 +4,89 @@ import numpy as np
 import plotly.express as px
 import io
 
-# --- 1. DIGITAL BENCHMARKS (India 2026) ---
-DIGITAL_BENCHMARKS = {
-    "A1": {"avg_cpm": 350, "bench_ctr": 1.2, "bench_vtr": 45},
-    "A2": {"avg_cpm": 280, "bench_ctr": 1.0, "bench_vtr": 35},
-    "B1": {"avg_cpm": 180, "bench_ctr": 0.8, "bench_vtr": 25}
+# --- 1. DATA & BENCHMARKS (Estimated for India 2026) ---
+MARKET_INTEL = {
+    "A1": {"cat_ecpm": 420, "cat_sov_pool_imps": 80000000, "base_cprc": 4500},
+    "A2": {"cat_ecpm": 310, "cat_sov_pool_imps": 150000000, "base_cprc": 3200},
+    "B1": {"cat_ecpm": 190, "cat_sov_pool_imps": 250000000, "base_cprc": 1800}
 }
 
 st.set_page_config(page_title="Virtual Media Planner", layout="wide")
-st.markdown("<h1 style='text-align: center;'>🌐 Virtual Media Planner</h1>", unsafe_allow_html=True)
 
-# --- 2. SIDEBAR INPUTS ---
+# --- CUSTOM HEADER ---
+st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>🌐 Virtual Media Planner</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Market Intelligence & Digital Operating Levels</p>", unsafe_allow_html=True)
+st.divider()
+
+# --- SIDEBAR: ONLY CAMPAIGN INPUTS ---
 with st.sidebar:
-    st.header("Campaign & Market Data")
-    nccs = st.selectbox("NCCS Tier", ["A1", "A2", "B1"])
+    st.header("Campaign Controls")
+    tg = st.selectbox("Target Group", ["Male 18-34", "Female 25-44", "All 15+"])
     market = st.selectbox("Market", ["Maharashtra", "Tamil Nadu", "Karnataka", "Delhi NCR"])
-    total_budget = st.number_input("Your Digital Budget (INR)", value=1000000, min_value=100000)
+    nccs = st.selectbox("NCCS", ["A1", "A2", "B1"])
+    total_budget = st.number_input("Campaign Budget (INR)", value=1500000, step=50000)
+    reach_target = st.slider("Target Reach (1+) %", 10, 95, 60)
+    woa = st.number_input("Weeks on Air", 1, 12, 4)
     
-    st.divider()
-    st.header("Competitive & SOV")
-    cat_monthly_imps = st.number_input("Estimated Category Monthly Impressions", value=50000000)
-    avg_cat_cpm = st.number_input("Avg. Category CPM (INR)", value=220)
-    
-    st.divider()
-    reach_goal = st.slider("Target Reach %", 10, 95, 60)
-    
-    submit = st.button("Generate Digital Plan", type="primary")
+    submit = st.button("Generate Strategy", type="primary")
 
-# --- 3. EXECUTION LOGIC ---
+# --- MAIN EXECUTION ---
 if submit:
-    # A. Efficiency Calculations
-    bench = DIGITAL_BENCHMARKS.get(nccs)
-    est_impressions = (total_budget / bench['avg_cpm']) * 1000
-    cprc = total_budget / reach_goal  # Cost Per Reach Point
-    sov = (est_impressions / cat_monthly_imps) * 100
+    # A. Calculations
+    intel = MARKET_INTEL.get(nccs)
     
-    # B. KPI & SOV Dashboard
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Est. Impressions", f"{round(est_impressions/1000000, 2)}M")
-    col2.metric("CPRC (Cost Per Reach Point)", f"₹{int(cprc):,}")
-    col3.metric("Digital SOV", f"{round(sov, 2)}%")
+    # Brand Metrics
+    brand_ecpm = intel['cat_ecpm'] * 0.95 # Assuming 5% optimization for the brand
+    brand_imps = (total_budget / brand_ecpm) * 1000
+    brand_sov = (brand_imps / (brand_imps + intel['cat_sov_pool_imps'])) * 100
+    cprc = total_budget / reach_target
 
-    # C. Benchmarking Chart
+    # B. COMPETITIVE INTELLIGENCE SECTION
+    st.subheader("📊 Market Intelligence & Share of Voice")
+    
+    m_col1, m_col2 = st.columns(2)
+    
+    with m_col1:
+        # Comparison Table
+        intel_df = pd.DataFrame({
+            "Metric": ["eCPM (Effective)", "SOV (Share of Voice)", "Estimated Impressions"],
+            "Your Brand": [f"₹{round(brand_ecpm, 2)}", f"{round(brand_sov, 2)}%", f"{round(brand_imps/1000000, 2)}M"],
+            "Category Average": [f"₹{intel['cat_ecpm']}", "100% (Market Pool)", f"{round(intel['cat_sov_pool_imps']/1000000, 2)}M"]
+        })
+        st.table(intel_df)
+    
+    with m_col2:
+        # SOV Gauge/Donut
+        fig_sov = px.pie(
+            values=[brand_imps, intel['cat_sov_pool_imps']], 
+            names=['Your Brand SOV', 'Remaining Category'],
+            hole=0.6,
+            color_discrete_sequence=['#1E3A8A', '#E5E7EB'],
+            title="Estimated Market SOV"
+        )
+        st.plotly_chart(fig_sov, use_container_width=True)
+
+    # C. REACH CURVE & OPERATING LEVELS
     st.divider()
-    st.subheader("📊 Performance Benchmarks vs. Market")
+    st.subheader("📈 Operating Levels & Reach Curve")
     
-    bench_data = pd.DataFrame({
-        "Metric": ["Avg. CPM (INR)", "Expected CTR (%)", "Expected VTR (%)"],
-        "Market Benchmark": [bench['avg_cpm'], bench['bench_ctr'], bench['bench_vtr']],
-        "Your Plan Proxy": [round(total_budget/(est_impressions/1000), 2), bench['bench_ctr'], bench['bench_vtr']]
-    })
-    st.table(bench_data)
-
-    # D. Reach Curve & Operating Levels
-    st.subheader("📈 Reach Distribution Curve (1+ to 10+)")
-    freqs = [f"{i}+" for i in range(1, 11)]
-    # Beta-Binomial approximation for Digital Reach
-    reach_vals = [reach_goal * (0.82**(i-1)) for i in range(1, 11)]
-    fig_curve = px.area(x=freqs, y=reach_vals, labels={'x': 'Frequency', 'y': 'Reach %'},
-                        title="Incremental Reach Decay")
-    st.plotly_chart(fig_curve, use_container_width=True)
-
-    # E. Genre Mix & Budget Bifurcation
-    st.divider()
-    st.subheader("🎯 Genre Strategy & Funnel Split")
+    o_col1, o_col2 = st.columns([1, 2])
     
-    g_col1, g_col2 = st.columns(2)
-    with g_col1:
-        genres = {"A1": "Business, Luxury, Tech, Global News", 
-                  "A2": "Infotainment, Sports, Lifestyle", 
-                  "B1": "Regional GEC, Music, Comedy"}
-        st.write(f"**Recommended Genre Clusters for {nccs}:**")
-        st.success(genres.get(nccs))
-    
-    with g_col2:
-        fig_pie = px.pie(values=[total_budget*0.5, total_budget*0.3, total_budget*0.2], 
-                         names=['Awareness (Video)', 'Consideration (Social)', 'Conversion (Search/WA)'],
-                         hole=0.4, title="Budget Bifurcation")
-        st.plotly_chart(fig_pie)
+    with o_col1:
+        st.metric("Cost Per Reach Point (CPRC)", f"₹{int(cprc):,}")
+        st.metric("Weekly GRP Requirement", round((reach_target * 3)/woa, 1)) # Based on 3+ freq proxy
+        st.info(f"Recommended Genres for {nccs}: \n\n **News, Infotainment, OTT Originals**")
 
-    # F. Excel Export
+    with o_col2:
+        freqs = [f"{i}+" for i in range(1, 11)]
+        # Logistic Reach build logic
+        reach_vals = [reach_target * (0.84**(i-1)) for i in range(1, 11)]
+        st.line_chart(pd.DataFrame({"Reach %": reach_vals}, index=freqs))
+
+    # D. EXCEL EXPORT
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        df_summary = pd.DataFrame({"Metric": ["Budget", "Reach %", "CPRC", "SOV %"], 
-                                   "Value": [total_budget, reach_goal, cprc, sov]})
-        df_summary.to_excel(writer, sheet_name='Executive_Summary', index=False)
-        bench_data.to_excel(writer, sheet_name='Benchmarks', index=False)
-
-    st.download_button("📥 Download Digital Media Plan", buffer.getvalue(), f"Digital_Plan_{market}.xlsx")
+        intel_df.to_excel(writer, sheet_name='Market_Intelligence', index=False)
+        pd.DataFrame({"Frequency": freqs, "Reach": reach_vals}).to_excel(writer, sheet_name='Reach_Curve', index=False)
+    
+    st.download_button("📥 Download Media Plan", buffer.getvalue(), f"VMP_Plan_{market}.xlsx")
