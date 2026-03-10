@@ -3,6 +3,7 @@ import pandas as pd
 import google.generativeai as genai
 import ast
 import re
+import math
 
 # --- 1. SYSTEM CONFIGURATION ---
 st.set_page_config(page_title="Media Intelligence Terminal", layout="wide", page_icon="🏛️")
@@ -33,7 +34,6 @@ st.markdown("""
     .label-text { color: #94A3B8; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
     .value-text { color: #F8FAFC; font-size: 2.1rem; font-weight: 800; margin-top: 4px; }
     hr { border: 0; height: 1px; background: linear-gradient(to right, rgba(59, 130, 246, 0), rgba(59, 130, 246, 0.5), rgba(59, 130, 246, 0)); margin: 30px 0; }
-    .stDataFrame { background: rgba(30, 41, 59, 0.2); border-radius: 12px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -79,7 +79,7 @@ INDIA_GEO_DATABASE = {
     }
 }
 
-# --- 5. SIDEBAR (RESTORED LOGIC) ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
     st.markdown("<h2 style='color:white;'>Media Command</h2>", unsafe_allow_html=True)
     m_type = st.radio("Market Type", ["Overall", "Urban", "Rural"], horizontal=True)
@@ -105,8 +105,8 @@ with st.sidebar:
     
     st.markdown("---")
     exp_reach = st.slider("Reach Goal (%)", 5, 100, 45)
-    eff_freq_n = st.number_input("Effective Freq (N+)", 1, 10, 4)
-    weeks_on_air = st.slider("Weeks on Air", 1, 52, 4) # RESTORED
+    eff_freq_n = st.number_input("Effective Freq (N+)", 1, 15, 4)
+    weeks_on_air = st.slider("Weeks on Air", 1, 52, 4)
     
     run_calc = st.button("EXECUTE ANALYSIS")
 
@@ -115,30 +115,43 @@ st.markdown("<h1 style='color:white;'>Digital Media <span style='color:#3B82F6;'
 
 if run_calc:
     with st.spinner('📡 PROCESSSING DUAL-LAYER INTELLIGENCE...'):
-        # --- A. PROMPT-BASED KPI LOGIC (Top 4 Cards) ---
-        # Factor in Weeks on Air for the Impressions
-        qual_u = int(962500 * (len(sel_zones)*0.22 if sel_zones else len(sel_states)*0.045) * (len(sel_age)*0.25))
+        # --- A. REFINED KPI LOGIC ---
+        # Universe Base Logic
+        base_u = 962500 
+        geo_weight = (len(sel_zones)*0.22 if sel_zones else len(sel_states)*0.045)
+        age_weight = (len(sel_age)*0.25)
+        qual_u = int(base_u * geo_weight * age_weight)
+        
+        # Reach & Freq Logic
         planned_reach_abs = int(qual_u * (exp_reach/100))
         
-        # Total Imps = Reach * Freq * Weeks
-        total_imps_val = int(planned_reach_abs * eff_freq_n * (weeks_on_air / 2)) # Adjusting multiplier for realism
+        # FREQ CAP CALCULATION: Ensures frequency headroom for effective delivery over duration
+        # Logic: Effective Freq + (Scaling factor based on time and reach goal)
+        freq_cap = math.ceil(eff_freq_n + (math.sqrt(weeks_on_air) * (exp_reach / 100)))
+        
+        # TOTAL IMPRESSIONS: reach * effective freq * duration-weighting
+        # We assume impressions need to be ~1.4x the effective goal to account for spillover/wastage
+        total_imps_val = int(planned_reach_abs * eff_freq_n * 1.4)
 
         c1, c2, c3, c4 = st.columns(4)
         with c1: st.markdown(f'<div class="metric-card"><div class="label-text">Universe</div><div class="value-text">{qual_u:,}</div></div>', unsafe_allow_html=True)
         with c2: st.markdown(f'<div class="metric-card"><div class="label-text">Reach</div><div class="value-text">{planned_reach_abs:,}</div></div>', unsafe_allow_html=True)
-        with c3: st.markdown(f'<div class="metric-card-orange"><div class="label-text">Duration</div><div class="value-text">{weeks_on_air} Weeks</div></div>', unsafe_allow_html=True)
+        with c3: st.markdown(f'<div class="metric-card-orange"><div class="label-text">Freq. Cap</div><div class="value-text">{freq_cap}</div></div>', unsafe_allow_html=True)
         with c4: st.markdown(f'<div class="metric-card"><div class="label-text">Total Imps</div><div class="value-text" style="color:#10B981;">{total_imps_val:,}</div></div>', unsafe_allow_html=True)
 
         st.markdown("<hr>", unsafe_allow_html=True)
+        
 
         # --- B. AI BRIDGE FOR TABLES ---
         prompt = f"""
         Act as a Media Planner for India 2026. 
         Target: {m_type} market in {sel_states if sel_states else sel_zones}. 
         Audience: {sel_gender}, Age {sel_age}, NCCS {sel_nccs}. Duration: {weeks_on_air} weeks.
+        Effective Frequency Goal: {eff_freq_n}+.
         Return a Python dictionary with:
         1. "genres": Top 10 Media Genres (Columns: Name, Reach%, Affinity Index, TimeSpent, Ranking)
         2. "platforms": Top 10 Media Platforms (Columns: Name, Reach%, Affinity Index, TimeSpent, Ranking)
+        Ensure values are realistic for the {m_type} market in India.
         Return ONLY the dictionary. No conversation.
         """
         
