@@ -92,59 +92,38 @@ with st.sidebar:
     m_type = st.radio("Market Type", ["Overall", "Urban", "Rural"], horizontal=True)
     st.markdown("---")
     
-    # 1. ZONE SELECTION 
-    # Logic: Lock Zone if State is already selected
+    # GEOGRAPHY LOCK LOGIC
     state_filled = len(st.session_state.get('state_selector', [])) > 0
-    if state_filled:
-        st.markdown("<p class='lock-msg'>🔒 Locked (State Focus Active)</p>", unsafe_allow_html=True)
-    
-    sel_zones = st.multiselect(
-        "1. Select Zones", 
-        list(INDIA_GEO_DATABASE.keys()), 
-        disabled=state_filled,
-        key="zone_selector"
-    )
+    if state_filled: st.markdown("<p class='lock-msg'>🔒 Locked (State Focus Active)</p>", unsafe_allow_html=True)
+    sel_zones = st.multiselect("1. Select Zones", list(INDIA_GEO_DATABASE.keys()), disabled=state_filled, key="zone_selector")
     zone_filled = len(sel_zones) > 0
 
-    # 2. STATE SELECTION
-    # Logic: Lock State if Zone is selected
-    if zone_filled:
-        st.markdown("<p class='lock-msg'>🔒 Locked (Zone Focus Active)</p>", unsafe_allow_html=True)
-    
+    if zone_filled: st.markdown("<p class='lock-msg'>🔒 Locked (Zone Focus Active)</p>", unsafe_allow_html=True)
     avail_states = []
     for z in INDIA_GEO_DATABASE: avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
-    
-    sel_states = st.multiselect(
-        "2. Select States", 
-        sorted(avail_states), 
-        disabled=zone_filled,
-        key="state_selector"
-    )
+    sel_states = st.multiselect("2. Select States", sorted(avail_states), disabled=zone_filled, key="state_selector")
 
-    # 3. DISTRICT SELECTION
-    # Logic: Locked if Zone is active OR if no states are selected
     dist_locked = zone_filled or not sel_states
     if dist_locked:
         msg = "🔒 Locked (Zone Active)" if zone_filled else "Select State first"
         st.markdown(f"<p class='lock-msg'>{msg}</p>", unsafe_allow_html=True)
-
     avail_districts = []
     FLAT_MAP = {}
     for z in INDIA_GEO_DATABASE: FLAT_MAP.update(INDIA_GEO_DATABASE[z])
     for s in sel_states: avail_districts.extend(FLAT_MAP.get(s, []))
-    
-    sel_districts = st.multiselect(
-        "3. Select Districts", 
-        sorted(list(set(avail_districts))), 
-        disabled=dist_locked,
-        key="dist_selector"
-    )
+    sel_districts = st.multiselect("3. Select Districts", sorted(list(set(avail_districts))), disabled=dist_locked, key="dist_selector")
 
     st.markdown("---")
+    # DEMOGRAPHICS
     sel_age = st.multiselect("4. Age Cohorts", ["15-24", "25-34", "35-44", "45+"], default=["15-24", "25-34"])
-    sel_nccs = st.multiselect("5. NCCS", ["A", "B", "C", "D", "E"], default=["A", "B"])
+    
+    # GENDER MODULE (NEW)
+    sel_gender = st.radio("5. Gender Focus", ["Both", "Male", "Female"], horizontal=True)
+    
+    sel_nccs = st.multiselect("6. NCCS", ["A", "B", "C", "D", "E"], default=["A", "B"])
     
     st.markdown("---")
+    # STRATEGY
     exp_reach = st.slider("Reach Goal (%)", 5, 100, 45)
     eff_freq_n = st.number_input("Effective Freq (N+)", 1, 10, 4)
     weeks_on_air = st.slider("Weeks on Air", 1, 52, 4)
@@ -158,22 +137,35 @@ if run_calc:
     # --- CALCULATION ENGINE ---
     INDIA_BASE = 958000 
     
+    # Geography Weight
     if zone_filled:
-        geo_weight = len(sel_zones) * 0.22 # Balanced zone weight
+        geo_weight = len(sel_zones) * 0.22 
     else:
         state_weight = (len(sel_states) * 0.045) if sel_states else 1.0
         dist_weight = (len(sel_districts) / max(1, len(avail_districts))) if sel_districts else 1.0
         geo_weight = state_weight * dist_weight
     
-    pen_map = {"Urban": 0.75, "Rural": 0.52, "Overall": 0.64}
-    qual_u = int(INDIA_BASE * geo_weight * pen_map[m_type] * (len(sel_age)*0.25) * (len(sel_nccs)*0.2))
+    # Demographics Factors
+    age_factor = len(sel_age) * 0.25
+    nccs_factor = len(sel_nccs) * 0.2
     
+    # Gender Factor Logic
+    # 1.0 for Both, approx 0.51 for Male, 0.49 for Female (India 2026 Census Adj)
+    gender_map = {"Both": 1.0, "Male": 0.51, "Female": 0.49}
+    gender_factor = gender_map[sel_gender]
+    
+    pen_map = {"Urban": 0.75, "Rural": 0.52, "Overall": 0.64}
+    
+    # CALCULATE QUALIFIED UNIVERSE
+    qual_u = int(INDIA_BASE * geo_weight * pen_map[m_type] * age_factor * nccs_factor * gender_factor)
+    
+    # Strategy Logic
     avg_f_total = round(eff_freq_n * (1 + (exp_reach / 150)), 1)
     planned_reach_abs = int(qual_u * (exp_reach / 100))
     total_imps_val = int(planned_reach_abs * avg_f_total)
     campaign_freq_cap = int(max(eff_freq_n + 2, (weeks_on_air * 3)))
 
-    # --- KPI ROW ONLY ---
+    # --- KPI ROW ---
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.markdown(f'<div class="metric-card"><div class="label-text">Qualified Target</div><div class="value-text">{qual_u:,}</div><div class="sub-text">Universe (\'000)</div></div>', unsafe_allow_html=True)
@@ -187,4 +179,4 @@ if run_calc:
     st.markdown("<br><br>", unsafe_allow_html=True)
 
 else:
-    st.markdown("<div style='text-align:center; padding-top:100px; color:#64748B; font-family:JetBrains Mono;'>TERMINAL STANDBY // GEOGRAPHY LOCKED // EXECUTE TO START</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; padding-top:100px; color:#64748B; font-family:JetBrains Mono;'>TERMINAL STANDBY // GEOGRAPHY & DEMOGRAPHICS LOCKED // EXECUTE TO START</div>", unsafe_allow_html=True)
