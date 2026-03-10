@@ -2,12 +2,14 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import ast
+import re
 
 # --- 1. SYSTEM CONFIGURATION ---
 st.set_page_config(page_title="Media Intelligence Terminal", layout="wide", page_icon="🏛️")
 
 # --- 2. SECURE API CONFIGURATION ---
 try:
+    # Ensure this matches your .streamlit/secrets.toml exactly
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
     model = genai.GenerativeModel('gemini-2.0-flash') 
@@ -32,11 +34,10 @@ st.markdown("""
     .label-text { color: #94A3B8; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
     .value-text { color: #F8FAFC; font-size: 2.1rem; font-weight: 800; margin-top: 4px; }
     hr { border: 0; height: 1px; background: linear-gradient(to right, rgba(59, 130, 246, 0), rgba(59, 130, 246, 0.5), rgba(59, 130, 246, 0)); margin: 30px 0; }
-    .stDataFrame { background: rgba(30, 41, 59, 0.2); border-radius: 12px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 4. EXHAUSTIVE GEOGRAPHY DATABASE (SOURCE OF TRUTH) ---
+# --- 4. GEOGRAPHY DATABASE (LOCKED) ---
 INDIA_GEO_DATABASE = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara", "North West Delhi", "South East Delhi"],
@@ -83,22 +84,16 @@ with st.sidebar:
     st.markdown("<h2 style='color:white;'>Media Command</h2>", unsafe_allow_html=True)
     m_type = st.radio("Market Type", ["Overall", "Urban", "Rural"], horizontal=True)
     
-    sel_zones = st.multiselect("1. Regions", list(INDIA_GEO_DATABASE.keys()))
-    
-    # State Logic based on Zone
+    sel_zones = st.multiselect("1. Select Regions", list(INDIA_GEO_DATABASE.keys()))
     avail_states = []
-    for z in sel_zones:
-        avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
-    sel_states = st.multiselect("2. States", sorted(avail_states))
+    for z in sel_zones: avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
+    sel_states = st.multiselect("2. Select States", sorted(avail_states))
 
-    # District Logic based on State
     avail_districts = []
     FLAT_MAP = {}
-    for z in INDIA_GEO_DATABASE:
-        FLAT_MAP.update(INDIA_GEO_DATABASE[z])
-    for s in sel_states:
-        avail_districts.extend(FLAT_MAP.get(s, []))
-    sel_districts = st.multiselect("3. Districts", sorted(list(set(avail_districts))))
+    for z in INDIA_GEO_DATABASE: FLAT_MAP.update(INDIA_GEO_DATABASE[z])
+    for s in sel_states: avail_districts.extend(FLAT_MAP.get(s, []))
+    sel_districts = st.multiselect("3. Select Districts", sorted(list(set(avail_districts))))
 
     st.markdown("---")
     sel_age = st.multiselect("4. Age Cohorts", ["15-24", "25-34", "35-44", "45+"], default=["15-24"])
@@ -106,7 +101,7 @@ with st.sidebar:
     sel_nccs = st.multiselect("6. NCCS", ["A", "B", "C", "D", "E"], default=["A", "B"])
     
     st.markdown("---")
-    exp_reach = st.slider("Reach Goal (%)", 5, 100, 45)
+    exp_reach_pct = st.slider("Reach Goal (%)", 5, 100, 45)
     eff_freq_n = st.number_input("Effective Freq (N+)", 1, 10, 4)
     run_calc = st.button("EXECUTE ANALYSIS")
 
@@ -114,57 +109,41 @@ with st.sidebar:
 st.markdown("<h1 style='color:white;'>Digital Media <span style='color:#3B82F6;'>Terminal 2026</span></h1>", unsafe_allow_html=True)
 
 if run_calc:
-    with st.spinner('📡 Gemini AI is fetching dual-layer media data...'):
-        # 1. KPI MATH (Simulated Baseline)
-        state_count = len(sel_states) if sel_states else 1
-        age_count = len(sel_age) if sel_age else 1
-        qual_u = int(1250000 * (state_count * 0.15) * (age_count * 0.2))
-        planned_reach_abs = int(qual_u * (exp_reach/100))
-        total_imps_val = int(planned_reach_abs * eff_freq_n * 1.25)
+    with st.spinner('📡 Generating AI Dual-Table Strategy...'):
+        # 1. KPI LOGIC (Ensuring these always work)
+        # Baseline per district approx 400k for digital active users
+        district_count = len(sel_districts) if sel_districts else (len(sel_states) * 5 if sel_states else 1)
+        age_factor = len(sel_age) * 0.25
         
-        # 2. KPI CARDS
+        calc_universe = int(district_count * 450000 * age_factor)
+        calc_reach = int(calc_universe * (exp_reach_pct / 100))
+        calc_imps = int(calc_reach * eff_freq_n * 1.4)
+        
+        # UI DISPLAY: TOP CARDS
         c1, c2, c3, c4 = st.columns(4)
-        with c1: st.markdown(f'<div class="metric-card"><div class="label-text">Universe</div><div class="value-text">{qual_u:,}</div></div>', unsafe_allow_html=True)
-        with c2: st.markdown(f'<div class="metric-card"><div class="label-text">Reach Target</div><div class="value-text">{planned_reach_abs:,}</div></div>', unsafe_allow_html=True)
-        with c3: st.markdown(f'<div class="metric-card-orange"><div class="label-text">Freq Cap</div><div class="value-text">{eff_freq_n}+</div></div>', unsafe_allow_html=True)
-        with c4: st.markdown(f'<div class="metric-card"><div class="label-text">Total Imps</div><div class="value-text" style="color:#10B981;">{total_imps_val:,}</div></div>', unsafe_allow_html=True)
+        with c1: st.markdown(f'<div class="metric-card"><div class="label-text">Universe</div><div class="value-text">{calc_universe:,}</div></div>', unsafe_allow_html=True)
+        with c2: st.markdown(f'<div class="metric-card"><div class="label-text">Reach @ {exp_reach_pct}%</div><div class="value-text">{calc_reach:,}</div></div>', unsafe_allow_html=True)
+        with c3: st.markdown(f'<div class="metric-card-orange"><div class="label-text">Effective Freq</div><div class="value-text">{eff_freq_n}x</div></div>', unsafe_allow_html=True)
+        with c4: st.markdown(f'<div class="metric-card"><div class="label-text">Total Imps</div><div class="value-text" style="color:#10B981;">{calc_imps:,}</div></div>', unsafe_allow_html=True)
 
         st.markdown("<hr>", unsafe_allow_html=True)
 
-        # 3. AI DUAL-TABLE PROMPT
+        # 2. AI DUAL-TABLE PROMPT
         prompt = f"""
-        Act as a 2026 India Media Planner.
-        Context: {m_type} market in {sel_states}, Districts: {sel_districts}.
-        Target Audience: {sel_gender}, Age: {sel_age}, NCCS: {sel_nccs}.
+        Act as a Media Planner. 
+        Context: {m_type} market in {sel_states}. Districts: {sel_districts}.
+        Audience: {sel_gender}, Age {sel_age}, NCCS {sel_nccs}.
         
-        Generate:
-        1. Top 10 Media Genres (Content Categories)
-        2. Top 10 Media Platforms (Publishers/Apps)
+        Task: Provide Top 10 Media GENRES and Top 10 Media PLATFORMS for 2026.
+        Required columns: Name, Reach%, Affinity Index, TimeSpent(Daily), Ranking.
         
-        Include: Name, Reach%, Affinity Index, Time Spent (Daily), and Ranking.
-        Return ONLY a Python dictionary with keys "genres" and "platforms".
-        Format: {{"genres": [{{...}}], "platforms": [{{...}}]}}
-        No prose, no markdown code blocks.
+        Return ONLY a Python dictionary. 
+        Example structure: {{"genres": [{{...}}], "platforms": [{{...}}]}}
+        No intro, no conversation, no markdown code blocks.
         """
         
         try:
             response = model.generate_content(prompt)
             raw_text = response.text.strip()
-            if "```" in raw_text:
-                raw_text = raw_text.split("```")[1].replace("python", "").replace("json", "").strip()
             
-            data = ast.literal_eval(raw_text)
-            
-            # 4. DATA DISPLAY
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.markdown("<p class='label-text'>Top 10 Media Genres</p>", unsafe_allow_html=True)
-                st.dataframe(pd.DataFrame(data["genres"]), hide_index=True, use_container_width=True)
-            with col_b:
-                st.markdown("<p class='label-text'>Top 10 Media Platforms</p>", unsafe_allow_html=True)
-                st.dataframe(pd.DataFrame(data["platforms"]), hide_index=True, use_container_width=True)
-
-        except Exception as e:
-            st.error(f"AI Bridge Failed: {e}")
-else:
-    st.markdown("<div style='text-align:center; padding-top:100px; color:#64748B;'>READY FOR COMMAND // SOURCE MARKETS LOCKED</div>", unsafe_allow_html=True)
+            # Sanitization Layer: Remove markdown if AI
