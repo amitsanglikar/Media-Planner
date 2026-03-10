@@ -9,7 +9,6 @@ st.set_page_config(page_title="Media Intelligence Terminal", layout="wide", page
 
 # --- 2. SECURE API CONFIGURATION ---
 try:
-    # Ensure this matches your .streamlit/secrets.toml exactly
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
     model = genai.GenerativeModel('gemini-2.0-flash') 
@@ -37,7 +36,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 4. GEOGRAPHY DATABASE (LOCKED) ---
+# --- 4. GEOGRAPHY DATABASE (SOURCE OF TRUTH) ---
 INDIA_GEO_DATABASE = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara", "North West Delhi", "South East Delhi"],
@@ -84,16 +83,16 @@ with st.sidebar:
     st.markdown("<h2 style='color:white;'>Media Command</h2>", unsafe_allow_html=True)
     m_type = st.radio("Market Type", ["Overall", "Urban", "Rural"], horizontal=True)
     
-    sel_zones = st.multiselect("1. Select Regions", list(INDIA_GEO_DATABASE.keys()))
+    sel_zones = st.multiselect("1. Regions", list(INDIA_GEO_DATABASE.keys()))
     avail_states = []
     for z in sel_zones: avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
-    sel_states = st.multiselect("2. Select States", sorted(avail_states))
+    sel_states = st.multiselect("2. States", sorted(avail_states))
 
     avail_districts = []
     FLAT_MAP = {}
     for z in INDIA_GEO_DATABASE: FLAT_MAP.update(INDIA_GEO_DATABASE[z])
     for s in sel_states: avail_districts.extend(FLAT_MAP.get(s, []))
-    sel_districts = st.multiselect("3. Select Districts", sorted(list(set(avail_districts))))
+    sel_districts = st.multiselect("3. Districts", sorted(list(set(avail_districts))))
 
     st.markdown("---")
     sel_age = st.multiselect("4. Age Cohorts", ["15-24", "25-34", "35-44", "45+"], default=["15-24"])
@@ -110,8 +109,7 @@ st.markdown("<h1 style='color:white;'>Digital Media <span style='color:#3B82F6;'
 
 if run_calc:
     with st.spinner('📡 Generating AI Dual-Table Strategy...'):
-        # 1. KPI LOGIC (Ensuring these always work)
-        # Baseline per district approx 400k for digital active users
+        # 1. KPI LOGIC 
         district_count = len(sel_districts) if sel_districts else (len(sel_states) * 5 if sel_states else 1)
         age_factor = len(sel_age) * 0.25
         
@@ -130,20 +128,33 @@ if run_calc:
 
         # 2. AI DUAL-TABLE PROMPT
         prompt = f"""
-        Act as a Media Planner. 
-        Context: {m_type} market in {sel_states}. Districts: {sel_districts}.
-        Audience: {sel_gender}, Age {sel_age}, NCCS {sel_nccs}.
-        
-        Task: Provide Top 10 Media GENRES and Top 10 Media PLATFORMS for 2026.
-        Required columns: Name, Reach%, Affinity Index, TimeSpent(Daily), Ranking.
-        
-        Return ONLY a Python dictionary. 
-        Example structure: {{"genres": [{{...}}], "platforms": [{{...}}]}}
-        No intro, no conversation, no markdown code blocks.
+        Act as a Media Planner for the India market in 2026. 
+        Market: {m_type} | States: {sel_states} | Audience: {sel_gender}, {sel_age}, NCCS {sel_nccs}.
+        Provide Top 10 Genres and Top 10 Platforms. Columns: Name, Reach%, Affinity, TimeSpent, Ranking.
+        Return ONLY a Python dictionary: {{"genres": [], "platforms": []}}. No other text.
         """
         
         try:
             response = model.generate_content(prompt)
             raw_text = response.text.strip()
             
-            # Sanitization Layer: Remove markdown if AI
+            # Sanitization Layer
+            match = re.search(r'\{.*\}', raw_text, re.DOTALL)
+            if match:
+                raw_text = match.group()
+            
+            data_dict = ast.literal_eval(raw_text)
+            
+            # Display Tables
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.markdown("<p class='label-text'>Top 10 Media Genres</p>", unsafe_allow_html=True)
+                st.dataframe(pd.DataFrame(data_dict["genres"]), use_container_width=True, hide_index=True)
+            with col_b:
+                st.markdown("<p class='label-text'>Top 10 Media Platforms</p>", unsafe_allow_html=True)
+                st.dataframe(pd.DataFrame(data_dict["platforms"]), use_container_width=True, hide_index=True)
+
+        except Exception as e:
+            st.error(f"AI Connection Error: {e}")
+else:
+    st.markdown("<div style='text-align:center; padding-top:100px; color:#64748B;'>READY FOR COMMAND // SOURCE MARKETS LOCKED</div>", unsafe_allow_html=True)
