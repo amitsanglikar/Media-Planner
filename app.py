@@ -4,6 +4,8 @@ import google.generativeai as genai
 import ast
 import re
 import math
+import numpy as np
+from scipy import stats
 
 # --- 1. SYSTEM CONFIGURATION ---
 st.set_page_config(page_title="Media Intelligence Terminal", layout="wide", page_icon="🏛️")
@@ -17,7 +19,7 @@ except Exception as e:
     st.error("Setup Error: Please ensure GEMINI_API_KEY is in your secrets.")
     st.stop()
 
-# --- 3. ELITE-UI CSS (FROZEN) ---
+# --- 3. ELITE-UI CSS ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap');
@@ -33,6 +35,7 @@ st.markdown("""
     }
     .label-text { color: #94A3B8; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
     .value-text { color: #F8FAFC; font-size: 2.1rem; font-weight: 800; margin-top: 4px; }
+    .warning-text { color: #F59E0B; font-size: 0.85rem; font-weight: 700; border: 1px solid #F59E0B; padding: 10px; border-radius: 8px; margin-top: 15px; background: rgba(245, 158, 11, 0.1); }
     hr { border: 0; height: 1px; background: linear-gradient(to right, rgba(59, 130, 246, 0), rgba(59, 130, 246, 0.5), rgba(59, 130, 246, 0)); margin: 30px 0; }
     </style>
     """, unsafe_allow_html=True)
@@ -79,7 +82,7 @@ INDIA_GEO_DATABASE = {
     }
 }
 
-# --- 5. SIDEBAR ---
+# --- 5. SIDEBAR LOGIC ---
 with st.sidebar:
     st.markdown("<h2 style='color:white;'>Media Command</h2>", unsafe_allow_html=True)
     m_type = st.radio("Market Type", ["Overall", "Urban", "Rural"], horizontal=True)
@@ -92,87 +95,87 @@ with st.sidebar:
     for z in INDIA_GEO_DATABASE: avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
     sel_states = st.multiselect("2. Select States", sorted(avail_states), disabled=len(sel_zones)>0, key="state_selector")
 
-    avail_districts = []
-    FLAT_MAP = {}
-    for z in INDIA_GEO_DATABASE: FLAT_MAP.update(INDIA_GEO_DATABASE[z])
-    for s in sel_states: avail_districts.extend(FLAT_MAP.get(s, []))
-    sel_districts = st.multiselect("3. Select Districts", sorted(list(set(avail_districts))), disabled=len(sel_zones)>0 or not sel_states, key="dist_selector")
-
     st.markdown("---")
-    sel_age = st.multiselect("4. Age Cohorts", ["15-24", "25-34", "35-44", "45+"], default=["15-24"])
-    sel_gender = st.radio("5. Gender Focus", ["Both", "Male", "Female"], horizontal=True)
-    sel_nccs = st.multiselect("6. NCCS", ["A", "B", "C", "D", "E"], default=["A", "B"])
+    sel_age = st.multiselect("3. Age Cohorts", ["15-24", "25-34", "35-44", "45+"], default=["15-24"])
+    sel_gender = st.radio("4. Gender Focus", ["Both", "Male", "Female"], horizontal=True)
+    sel_nccs = st.multiselect("5. NCCS", ["A", "B", "C", "D", "E"], default=["A", "B"])
     
     st.markdown("---")
-    exp_reach = st.slider("Reach Goal (%)", 5, 100, 45)
+    exp_reach = st.slider("Reach Goal (%) at N+", 5, 100, 45)
     eff_freq_n = st.number_input("Effective Freq (N+)", 1, 15, 4)
     weeks_on_air = st.slider("Weeks on Air", 1, 52, 4)
     
     run_calc = st.button("EXECUTE ANALYSIS")
 
-# --- 6. MAIN OUTPUT ---
+# --- 6. POISSON CALCULATOR (3/WEEK CAP PRINCIPLE) ---
+def calculate_pacing_physics(target_reach_n, n_plus, weeks):
+    # Constraint: 3 Imps/User/Week (1+)
+    fixed_weekly_cap = 3
+    max_achievable_lambda = fixed_weekly_cap * weeks
+    
+    # Solve for required Lambda
+    required_lambda = 0
+    for l in np.arange(0.1, 50.0, 0.05):
+        reach_at_n = 1 - stats.poisson.cdf(n_plus - 1, l)
+        if reach_at_n >= (target_reach_n / 100):
+            required_lambda = l
+            break
+            
+    reach_1_plus = (1 - math.exp(-required_lambda)) * 100 if required_lambda > 0 else 0
+    deficit = required_lambda > max_achievable_lambda
+    
+    return required_lambda, reach_1_plus, deficit
+
+# --- 7. MAIN DASHBOARD ---
 st.markdown("<h1 style='color:white;'>Digital Media <span style='color:#3B82F6;'>Terminal 2026</span></h1>", unsafe_allow_html=True)
 
 if run_calc:
-    with st.spinner('📡 PROCESSSING DUAL-LAYER INTELLIGENCE...'):
-        # --- A. REFINED KPI LOGIC ---
-        # Universe Base Logic
-        base_u = 962500 
-        geo_weight = (len(sel_zones)*0.22 if sel_zones else len(sel_states)*0.045)
-        age_weight = (len(sel_age)*0.25)
-        qual_u = int(base_u * geo_weight * age_weight)
+    with st.spinner('📡 QUANTIZING AUDIENCE PHYSICS...'):
+        l_val, r1_val, is_deficit = calculate_pacing_physics(exp_reach, eff_freq_n, weeks_on_air)
         
-        # Reach & Freq Logic
+        # Universe Math
+        base_u = 1250000 # Normalized base
+        geo_weight = (len(sel_zones)*0.25 if sel_zones else len(sel_states)*0.06 if sel_states else 1.0)
+        qual_u = int(base_u * geo_weight * (len(sel_age)*0.3))
+        
         planned_reach_abs = int(qual_u * (exp_reach/100))
-        
-        # FREQ CAP CALCULATION: Ensures frequency headroom for effective delivery over duration
-        # Logic: Effective Freq + (Scaling factor based on time and reach goal)
-        freq_cap = math.ceil(eff_freq_n + (math.sqrt(weeks_on_air) * (exp_reach / 100)))
-        
-        # TOTAL IMPRESSIONS: reach * effective freq * duration-weighting
-        # We assume impressions need to be ~1.4x the effective goal to account for spillover/wastage
-        total_imps_val = int(planned_reach_abs * eff_freq_n * 1.4)
+        total_imps_val = int(planned_reach_abs * l_val * 1.15) # 15% wastage buffer
 
         c1, c2, c3, c4 = st.columns(4)
         with c1: st.markdown(f'<div class="metric-card"><div class="label-text">Universe</div><div class="value-text">{qual_u:,}</div></div>', unsafe_allow_html=True)
-        with c2: st.markdown(f'<div class="metric-card"><div class="label-text">Reach</div><div class="value-text">{planned_reach_abs:,}</div></div>', unsafe_allow_html=True)
-        with c3: st.markdown(f'<div class="metric-card-orange"><div class="label-text">Freq. Cap</div><div class="value-text">{freq_cap}</div></div>', unsafe_allow_html=True)
-        with c4: st.markdown(f'<div class="metric-card"><div class="label-text">Total Imps</div><div class="value-text" style="color:#10B981;">{total_imps_val:,}</div></div>', unsafe_allow_html=True)
+        with c2: st.markdown(f'<div class="metric-card"><div class="label-text">Reach @ {eff_freq_n}+</div><div class="value-text">{planned_reach_abs:,}</div></div>', unsafe_allow_html=True)
+        with c3: st.markdown(f'<div class="metric-card-orange"><div class="label-text">Freq. Cap (1+)</div><div class="value-text">3/Week</div></div>', unsafe_allow_html=True)
+        with c4: st.markdown(f'<div class="metric-card"><div class="label-text">Est. Imps</div><div class="value-text" style="color:#10B981;">{total_imps_val:,}</div></div>', unsafe_allow_html=True)
+
+        # Physics Validation Warnings
+        if is_deficit:
+            st.markdown(f"<div class='warning-text'>⚠️ FREQUENCY DEFICIT: A 3/week cap yields max {weeks_on_air*3} exposures. Your {eff_freq_n}+ goal requires ~{l_val:.1f} avg frequency. Increase duration or reduce reach goal.</div>", unsafe_allow_html=True)
+        elif r1_val > 98:
+            st.markdown(f"<div class='warning-text' style='color:#EF4444; border-color:#EF4444;'>⚠️ SATURATION ERROR: Required 1+ reach ({r1_val:.1f}%) exceeds population limit.</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<p style='color:#94A3B8; font-size:0.8rem; margin-top:15px;'>ℹ️ Operational 1+ Reach Required: {r1_val:.1f}% | Total Lambda: {l_val:.2f}</p>", unsafe_allow_html=True)
 
         st.markdown("<hr>", unsafe_allow_html=True)
         
+        
 
-        # --- B. AI BRIDGE FOR TABLES ---
-        prompt = f"""
-        Act as a Media Planner for India 2026. 
-        Target: {m_type} market in {sel_states if sel_states else sel_zones}. 
-        Audience: {sel_gender}, Age {sel_age}, NCCS {sel_nccs}. Duration: {weeks_on_air} weeks.
-        Effective Frequency Goal: {eff_freq_n}+.
-        Return a Python dictionary with:
-        1. "genres": Top 10 Media Genres (Columns: Name, Reach%, Affinity Index, TimeSpent, Ranking)
-        2. "platforms": Top 10 Media Platforms (Columns: Name, Reach%, Affinity Index, TimeSpent, Ranking)
-        Ensure values are realistic for the {m_type} market in India.
-        Return ONLY the dictionary. No conversation.
-        """
+        # AI Contextual Intelligence
+        prompt = f"Act as an Indian Media Planner 2026. Market: {m_type}. Regions: {sel_states if sel_states else sel_zones}. Audience: {sel_gender}, {sel_age}, NCCS {sel_nccs}. Parameters: {exp_reach}% reach at {eff_freq_n}+ over {weeks_on_air} weeks with 3/week cap. Return a Python dictionary with 'genres' and 'platforms' (Top 10 each, columns: Name, Reach%, Affinity, TimeSpent, Ranking). Return ONLY the dictionary."
         
         try:
             response = model.generate_content(prompt)
-            raw_text = response.text.strip()
-            match = re.search(r'\{.*\}', raw_text, re.DOTALL)
-            if match: raw_text = match.group()
+            clean_text = re.search(r'\{.*\}', response.text, re.DOTALL).group()
+            data_dict = ast.literal_eval(clean_text)
             
-            data_dict = ast.literal_eval(raw_text)
-            
-            col_left, col_right = st.columns(2)
-            with col_left:
-                st.markdown("<p class='label-text'>Top 10 Media Genres</p>", unsafe_allow_html=True)
+            col_l, col_r = st.columns(2)
+            with col_l:
+                st.markdown("<p class='label-text'>Top Media Genres</p>", unsafe_allow_html=True)
                 st.dataframe(pd.DataFrame(data_dict["genres"]), use_container_width=True, hide_index=True)
-            with col_right:
-                st.markdown("<p class='label-text'>Top 10 Media Platforms</p>", unsafe_allow_html=True)
+            with col_r:
+                st.markdown("<p class='label-text'>Top Media Platforms</p>", unsafe_allow_html=True)
                 st.dataframe(pd.DataFrame(data_dict["platforms"]), use_container_width=True, hide_index=True)
-        
         except Exception as e:
-            st.error(f"AI Table Engine Failed: {e}")
+            st.error(f"Intelligence Engine Offline: {e}")
 
 else:
-    st.markdown("<div style='text-align:center; padding-top:100px; color:#64748B;'>READY FOR COMMAND // DATA LOCK ACTIVE</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; padding-top:100px; color:#64748B; font-family:\"JetBrains Mono\";'>SYSTEM IDLE // PACING PROTOCOL: 3 IMP/WEEK 1+</div>", unsafe_allow_html=True)
