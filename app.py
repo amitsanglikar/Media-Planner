@@ -105,16 +105,10 @@ if run_calc:
     state_ratio = (len(sel_states) / 36) if sel_states else 1.0
     pen_map = {"Urban": 0.75, "Rural": 0.52, "Overall": 0.64}
     
-    # Audience Sizing
     qual_u = int(INDIA_BASE * state_ratio * pen_map[m_type] * (len(sel_age)*0.25) * (len(sel_nccs)*0.2))
     
-    # OVERALL CAMPAIGN FREQUENCY LOGIC
-    # Average Frequency Required (Total Campaign)
-    # Calculated as N+ modified by the intensity of the Reach goal
+    # GLOBAL CAMPAIGN FREQUENCY LOGIC
     avg_f_total = round(eff_freq_n * (1 + (exp_reach / 180)), 1)
-    
-    # Campaign Frequency Cap (Global Limit)
-    # Typically 1.8x to 2.5x the Avg Frequency to ensure Reach builds without individual over-saturation
     campaign_freq_cap = round(avg_f_total * 2.2, 0)
     
     planned_reach_abs = int(qual_u * (exp_reach / 100))
@@ -127,16 +121,16 @@ if run_calc:
     with c2:
         st.markdown(f'<div class="metric-card"><div class="label-text">Planned Reach</div><div class="value-text">{planned_reach_abs:,}</div><div class="sub-text">{exp_reach}% Reach Goal</div></div>', unsafe_allow_html=True)
     with c3:
-        st.markdown(f'<div class="metric-card"><div class="label-text">Avg. Frequency</div><div class="value-text" style="color:#60A5FA;">{avg_f_total}x</div><div class="sub-text">Total for {weeks_on_air} Weeks</div></div>', unsafe_allow_html=True)
+        # Removed 'x'
+        st.markdown(f'<div class="metric-card"><div class="label-text">Avg. Frequency</div><div class="value-text" style="color:#60A5FA;">{avg_f_total}</div><div class="sub-text">Total for {weeks_on_air} Weeks</div></div>', unsafe_allow_html=True)
     with c4:
-        st.markdown(f'<div class="metric-card"><div class="label-text">Campaign Freq Cap</div><div class="value-text" style="color:#10B981;">{int(campaign_freq_cap)}x</div><div class="sub-text">Overall Strategy Limit</div></div>', unsafe_allow_html=True)
+        # Removed 'x'
+        st.markdown(f'<div class="metric-card"><div class="label-text">Campaign Freq Cap</div><div class="value-text" style="color:#10B981;">{int(campaign_freq_cap)}</div><div class="sub-text">Overall Strategy Limit</div></div>', unsafe_allow_html=True)
 
     # --- STRATEGIC QUALIFICATION TABLE ---
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
     st.markdown("<p class='label-text'>Campaign Qualification & Volume Matrix</p>", unsafe_allow_html=True)
-    
-    
     
     matrix_data = {
         "Strategic Parameter": [
@@ -149,8 +143,8 @@ if run_calc:
         "System Value": [
             f"{eff_freq_n}+ Exposures", 
             f"{weeks_on_air} Weeks", 
-            f"{avg_f_total}x", 
-            f"{int(campaign_freq_cap)}x", 
+            f"{avg_f_total}", 
+            f"{int(campaign_freq_cap)}", 
             f"{total_imps_000:,}"
         ],
         "Rationale": [
@@ -166,8 +160,7 @@ if run_calc:
 
     
 
-    # --- IMPACT INSIGHT ---
-    st.info(f"💡 Execution Note: To hit {exp_reach}% reach at a {eff_freq_n}+ threshold over {weeks_on_air} weeks, the terminal has provisioned {total_imps_000:,}k impressions. The Global Frequency Cap is set at {int(campaign_freq_cap)}x to maximize unique user discovery.")
+    st.info(f"💡 Strategy: To hit {exp_reach}% reach at a {eff_freq_n}+ threshold over {weeks_on_air} weeks, the terminal has provisioned {total_imps_000:,}k impressions.")
 
 else:
     st.markdown("<div style='text-align:center; padding-top:100px; color:#64748B;'>Terminal Standby. Configure Sidebar and Execute.</div>", unsafe_allow_html=True)
