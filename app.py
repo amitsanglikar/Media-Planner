@@ -106,6 +106,8 @@ with st.sidebar:
     st.markdown("---")
     exp_reach = st.slider("Reach Goal (%)", 5, 100, 45)
     eff_freq_n = st.number_input("Effective Freq (N+)", 1, 10, 4)
+    weeks_on_air = st.slider("Weeks on Air", 1, 52, 4) # RESTORED
+    
     run_calc = st.button("EXECUTE ANALYSIS")
 
 # --- 6. MAIN OUTPUT ---
@@ -114,14 +116,17 @@ st.markdown("<h1 style='color:white;'>Digital Media <span style='color:#3B82F6;'
 if run_calc:
     with st.spinner('📡 PROCESSSING DUAL-LAYER INTELLIGENCE...'):
         # --- A. PROMPT-BASED KPI LOGIC (Top 4 Cards) ---
+        # Factor in Weeks on Air for the Impressions
         qual_u = int(962500 * (len(sel_zones)*0.22 if sel_zones else len(sel_states)*0.045) * (len(sel_age)*0.25))
         planned_reach_abs = int(qual_u * (exp_reach/100))
-        total_imps_val = int(planned_reach_abs * 5.2)
+        
+        # Total Imps = Reach * Freq * Weeks
+        total_imps_val = int(planned_reach_abs * eff_freq_n * (weeks_on_air / 2)) # Adjusting multiplier for realism
 
         c1, c2, c3, c4 = st.columns(4)
         with c1: st.markdown(f'<div class="metric-card"><div class="label-text">Universe</div><div class="value-text">{qual_u:,}</div></div>', unsafe_allow_html=True)
         with c2: st.markdown(f'<div class="metric-card"><div class="label-text">Reach</div><div class="value-text">{planned_reach_abs:,}</div></div>', unsafe_allow_html=True)
-        with c3: st.markdown(f'<div class="metric-card-orange"><div class="label-text">Avg Freq</div><div class="value-text">5.2</div></div>', unsafe_allow_html=True)
+        with c3: st.markdown(f'<div class="metric-card-orange"><div class="label-text">Duration</div><div class="value-text">{weeks_on_air} Weeks</div></div>', unsafe_allow_html=True)
         with c4: st.markdown(f'<div class="metric-card"><div class="label-text">Total Imps</div><div class="value-text" style="color:#10B981;">{total_imps_val:,}</div></div>', unsafe_allow_html=True)
 
         st.markdown("<hr>", unsafe_allow_html=True)
@@ -130,7 +135,7 @@ if run_calc:
         prompt = f"""
         Act as a Media Planner for India 2026. 
         Target: {m_type} market in {sel_states if sel_states else sel_zones}. 
-        Audience: {sel_gender}, Age {sel_age}, NCCS {sel_nccs}.
+        Audience: {sel_gender}, Age {sel_age}, NCCS {sel_nccs}. Duration: {weeks_on_air} weeks.
         Return a Python dictionary with:
         1. "genres": Top 10 Media Genres (Columns: Name, Reach%, Affinity Index, TimeSpent, Ranking)
         2. "platforms": Top 10 Media Platforms (Columns: Name, Reach%, Affinity Index, TimeSpent, Ranking)
@@ -140,7 +145,6 @@ if run_calc:
         try:
             response = model.generate_content(prompt)
             raw_text = response.text.strip()
-            # Clean AI noise
             match = re.search(r'\{.*\}', raw_text, re.DOTALL)
             if match: raw_text = match.group()
             
