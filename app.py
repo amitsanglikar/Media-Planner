@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
 
 # --- 1. SYSTEM CONFIGURATION ---
 st.set_page_config(page_title="Media Intelligence Terminal", layout="wide", page_icon="🏛️")
@@ -34,8 +33,6 @@ st.markdown("""
     .sub-text { color: #3B82F6; font-size: 0.75rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
     .sub-text-orange { color: #FB923C; font-size: 0.75rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
     
-    .lock-msg { color: #EF4444; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; margin-bottom: 4px; display: block; }
-
     .stButton>button {
         background: linear-gradient(90deg, #EA580C 0%, #FB923C 100%) !important;
         border: none !important; border-radius: 8px !important; color: white !important;
@@ -45,7 +42,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. EXHAUSTIVE GEOGRAPHY DATABASE (As Requested) ---
+# --- 3. EXHAUSTIVE GEOGRAPHY DATABASE ---
 INDIA_GEO_DATABASE = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara", "North West Delhi", "South East Delhi"],
@@ -106,7 +103,6 @@ with st.sidebar:
     FLAT_MAP = {}
     for z in INDIA_GEO_DATABASE: FLAT_MAP.update(INDIA_GEO_DATABASE[z])
     for s in sel_states: avail_districts.extend(FLAT_MAP.get(s, []))
-    
     sel_districts = st.multiselect("3. Select Districts", sorted(list(set(avail_districts))), disabled=not sel_states)
 
     st.markdown("---")
@@ -126,8 +122,7 @@ st.markdown("<h1 style='color:white;'>Digital Media <span style='color:#3B82F6;'
 if run_calc:
     # --- CALCULATION ENGINE ---
     INDIA_BASE = 958000 
-    
-    state_weight = (len(sel_states) * 0.04) if sel_states else 1.0
+    state_weight = (len(sel_states) * 0.045) if sel_states else 1.0
     dist_weight = (len(sel_districts) / max(1, len(avail_districts))) if sel_districts else 1.0
     
     pen_map = {"Urban": 0.75, "Rural": 0.52, "Overall": 0.64}
@@ -136,11 +131,9 @@ if run_calc:
     avg_f_total = round(eff_freq_n * (1 + (exp_reach / 150)), 1)
     planned_reach_abs = int(qual_u * (exp_reach / 100))
     total_imps_val = int(planned_reach_abs * avg_f_total)
-    
-    # Campaign Frequency Cap logic
     campaign_freq_cap = int(max(eff_freq_n + 2, (weeks_on_air * 3)))
 
-    # --- KPI ROW ---
+    # --- KPI ROW ONLY ---
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.markdown(f'<div class="metric-card"><div class="label-text">Qualified Target</div><div class="value-text">{qual_u:,}</div><div class="sub-text">Universe (\'000)</div></div>', unsafe_allow_html=True)
@@ -151,27 +144,8 @@ if run_calc:
     with c4:
         st.markdown(f'<div class="metric-card"><div class="label-text">Gross Impressions</div><div class="value-text" style="color:#10B981;">{total_imps_val:,}</div><div class="sub-text">Total Volume (\'000)</div></div>', unsafe_allow_html=True)
 
-    # Funnel Visual
-    st.markdown("<br>", unsafe_allow_html=True)
-    fig = go.Figure(go.Funnel(
-        y=["National Base", "Selected Market", "Final Target"],
-        x=[INDIA_BASE, int(INDIA_BASE * state_weight * dist_weight), qual_u],
-        textinfo="value+percent initial",
-        marker={"color": ["#1E293B", "#3B82F6", "#FB923C"]}
-    ))
-    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="#94A3B8"), height=400)
-    st.plotly_chart(fig, use_container_width=True)
-
-    # Matrix Data
-    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-    st.markdown("<p class='label-text'>Strategic Control Matrix</p>", unsafe_allow_html=True)
-    matrix_data = {
-        "Strategic Parameter": ["Effective Freq (N+)", "Campaign Duration", "Overall Avg Frequency", "Campaign Freq Cap", "Reach Build Index"],
-        "Value": [f"{eff_freq_n}+", f"{weeks_on_air} Weeks", f"{avg_f_total}", f"{campaign_freq_cap}", f"{round(exp_reach/weeks_on_air, 1)}% / wk"],
-        "Planning Rationale": ["Impact Threshold", "Continuity Period", "Weighted Mean", "Saturation Protection", "Velocity Score"]
-    }
-    st.table(pd.DataFrame(matrix_data))
-    st.markdown("</div>", unsafe_allow_html=True)
+    # SPACE RESERVED FOR YOUR NEXT MODULES BELOW
+    st.markdown("<br><br>", unsafe_allow_html=True)
 
 else:
     st.markdown("<div style='text-align:center; padding-top:100px; color:#64748B; font-family:JetBrains Mono;'>TERMINAL STANDBY // GEOGRAPHY LOCKED // EXECUTE TO START</div>", unsafe_allow_html=True)
