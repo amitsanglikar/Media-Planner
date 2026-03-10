@@ -69,7 +69,7 @@ INDIA_GEO_DATABASE = {
     }
 }
 
-# --- 4. SIDEBAR LOGIC ---
+# --- 4. SIDEBAR ---
 with st.sidebar:
     st.markdown("<h2 style='color:white;'>Media Command</h2>", unsafe_allow_html=True)
     m_type = st.radio("Market Type", ["Overall", "Urban", "Rural"], horizontal=True)
@@ -106,7 +106,7 @@ with st.sidebar:
 st.markdown("<h1 style='color:white;'>Digital Media <span style='color:#3B82F6;'>Terminal 2026</span></h1>", unsafe_allow_html=True)
 
 if run_calc:
-    # --- CALCULATION LOGIC ---
+    # --- CALCULATION ENGINE ---
     INDIA_BASE = 958000 
     state_factor = (len(sel_states) / 36) if sel_states else 1.0
     dist_factor = (len(sel_districts) / 766) if sel_districts else 1.0 
@@ -114,50 +114,41 @@ if run_calc:
     pen_map = {"Urban": 0.75, "Rural": 0.52, "Overall": 0.64}
     qual_u = int(INDIA_BASE * state_factor * dist_factor * pen_map[m_type] * (len(sel_age)*0.25) * (len(sel_nccs)*0.2))
     
+    # Core Strategy Logic
     avg_f_total = round(eff_freq_n * (1 + (exp_reach / 180)), 1)
     planned_reach_abs = int(qual_u * (exp_reach / 100))
     total_imps_val = int(planned_reach_abs * avg_f_total)
-    req_imps_per_reach_pt = int(total_imps_val / exp_reach) if exp_reach > 0 else 0
+    
+    # THE RESTORED FREQ CAP
+    # Global cap to ensure Reach builds over duration without over-saturation
     campaign_freq_cap = int(avg_f_total * 2.2)
 
-    # --- TOP KPI ROW ---
+    # --- TOP KPI ROW (FREQ CAP RESTORED) ---
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         st.markdown(f'<div class="metric-card"><div class="label-text">Qualified Target</div><div class="value-text">{qual_u:,}</div><div class="sub-text">Universe (\'000)</div></div>', unsafe_allow_html=True)
     with c2:
         st.markdown(f'<div class="metric-card"><div class="label-text">Planned Reach</div><div class="value-text">{planned_reach_abs:,}</div><div class="sub-text">{exp_reach}% Reach Goal</div></div>', unsafe_allow_html=True)
     with c3:
-        st.markdown(f'<div class="metric-card"><div class="label-text">Required Imps.</div><div class="value-text" style="color:#60A5FA;">{req_imps_per_reach_pt:,}</div><div class="sub-text">Per 1% Reach (\'000)</div></div>', unsafe_allow_html=True)
+        # Restore Freq Cap here for maximum visibility
+        st.markdown(f'<div class="metric-card"><div class="label-text">Freq. Cap</div><div class="value-text" style="color:#60A5FA;">{campaign_freq_cap}</div><div class="sub-text">Campaign Global Limit</div></div>', unsafe_allow_html=True)
     with c4:
         st.markdown(f'<div class="metric-card"><div class="label-text">Gross Impressions</div><div class="value-text" style="color:#10B981;">{total_imps_val:,}</div><div class="sub-text">Total Volume (\'000)</div></div>', unsafe_allow_html=True)
 
-    # --- AUDIENCE QUALIFICATION TABLE (BELOW TARGET) ---
+    # --- DATA MATRIX ---
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-    st.markdown("<p class='label-text'>Audience Qualification Breakdown</p>", unsafe_allow_html=True)
-    
-    table_data = {
-        "Attribute": ["Total Population (Geo)", "Active Digital Universe", "Age & Income Qualified", "Campaign Planned Reach"],
-        "Audience ('000)": [f"{int(INDIA_BASE*state_factor*dist_factor):,}", f"{int(INDIA_BASE*state_factor*dist_factor*pen_map[m_type]):,}", f"{qual_u:,}", f"{planned_reach_abs:,}"],
-        "Retention %": ["100%", f"{pen_map[m_type]*100:.0f}%", f"{(qual_u/max(1, int(INDIA_BASE*state_factor*dist_factor*pen_map[m_type])))*100:.1f}%", f"{exp_reach}%"]
-    }
-    st.table(pd.DataFrame(table_data))
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    
-
-    # --- STRATEGIC CONTROL TABLE ---
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-    st.markdown("<p class='label-text'>Campaign Strategic Control Matrix</p>", unsafe_allow_html=True)
+    st.markdown("<p class='label-text'>Strategic Control Matrix</p>", unsafe_allow_html=True)
     
     matrix_data = {
-        "Parameter": ["Effective Frequency", "Campaign Duration", "Overall Avg Frequency", "Global Frequency Cap"],
-        "Value": [f"{eff_freq_n}+", f"{weeks_on_air} Weeks", f"{avg_f_total}", f"{campaign_freq_cap}"],
-        "Rationale": ["Minimum Depth", "Continuity", "Weighted Delivery", "Saturation Cap"]
+        "Strategic Parameter": ["Effective Freq (N+)", "Campaign Duration", "Overall Avg Frequency", "Campaign Freq Cap", "Gross Impressions ('000)"],
+        "Value": [f"{eff_freq_n}+", f"{weeks_on_air} Weeks", f"{avg_f_total}", f"{campaign_freq_cap}", f"{total_imps_val:,}"],
+        "Planning Rationale": ["Impact Threshold", "Continuity Period", "Weighted Mean", "Saturation Protection", "Inventory Pipeline"]
     }
     st.table(pd.DataFrame(matrix_data))
     st.markdown("</div>", unsafe_allow_html=True)
+
+    
 
 else:
     st.markdown("<div style='text-align:center; padding-top:100px; color:#64748B;'>Terminal Standby. Geography Locked. Click EXECUTE.</div>", unsafe_allow_html=True)
