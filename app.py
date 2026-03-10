@@ -151,10 +151,20 @@ if run_calc:
         geo_weight = state_base * (0.43 if m_type == "Urban" else 0.57)
         market_label = f"{m_type} Segment"
     else:
-        geo_weight = (len(sel_states) * 0.038) if sel_states else 0.0
-        if sel_districts:
-            geo_weight *= (len(sel_districts) / max(1, len(available_districts)))
-        market_label = "District/State Focus"
+        # Overall mode defaults to full India when no state/district filters are selected.
+        if not sel_states:
+            geo_weight = 1.0
+            market_label = "Overall India"
+        else:
+            geo_weight = len(sel_states) * 0.038
+            if sel_districts:
+                geo_weight *= (len(sel_districts) / max(1, len(available_districts)))
+                market_label = "District Focus"
+            else:
+                market_label = "State Focus"
+
+    # Keep weight within valid bounds.
+    geo_weight = max(0.0, min(geo_weight, 1.0))
 
     market_size = int(TOTAL_INDIA_DIGITAL * geo_weight)
     
@@ -182,8 +192,6 @@ if run_calc:
     ]
     for col, (lab, val, sub) in zip([c1, c2, c3, c4], metrics):
         col.markdown(f"""<div class="metric-card"><div class="label-text">{lab}</div><div class="value-text">{val}</div><div class="sub-text">⚡ {sub}</div></div>""", unsafe_allow_html=True)
-
-    
 
     # HERO VISUAL: THE FUNNEL
     st.markdown("<br><div class='metric-card'>", unsafe_allow_html=True)
