@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
-import ast
-import re
 import math
 import numpy as np
 from scipy import stats
@@ -11,10 +9,12 @@ from scipy import stats
 st.set_page_config(page_title="Virtual Media Terminal 2026", layout="wide", page_icon="📡")
 
 try:
+    # Attempt to load from Streamlit Secrets
     API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash') 
-except:
+    # Using 1.5 Flash as the standard stable 2026 workhorse
+    model = genai.GenerativeModel('gemini-1.5-flash') 
+except Exception as e:
     st.error("Setup Error: Ensure GEMINI_API_KEY is in secrets.")
     st.stop()
 
@@ -29,7 +29,7 @@ st.markdown("""
     .metric-card, .metric-card-impact {
         background: rgba(0, 0, 0, 0.6); border: 1px solid #00f2ff33;
         padding: 1.5rem; border-radius: 12px; border-left: 5px solid #00f2ff;
-        min-height: 160px;
+        min-height: 160px; margin-bottom: 10px;
     }
     .metric-card-impact { border-color: #bc13fe33; border-left: 5px solid #bc13fe; }
     
@@ -49,7 +49,7 @@ st.markdown("""
     }
     .glossary-term { color: #00f2ff; font-weight: 700; font-family: 'JetBrains Mono'; display: block; margin-top: 12px; }
     
-    .sov-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; margin-top: 10px; display: inline-block; color: white; }
+    .sov-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; margin-top: 10px; display: inline-block; color: white; text-transform: uppercase; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -101,13 +101,17 @@ def calculate_physics(reach_goal_n, n_plus, weeks, m_type):
     l_final = 0
     # Iterative solver for Poisson distribution
     for l in np.arange(0.1, 150.0, 0.1):
+        # We solve for the tail probability: P(X >= n_plus)
         if (1 - stats.poisson.cdf(n_plus - 1, l)) * 100 >= reach_goal_n:
             l_final = l
             break
     
-    reach_1p = (1 - math.exp(-l_final)) * 100
+    # 1.3x Wastage/Recall Multiplier is applied to the raw Lambda
+    l_impact = l_final * 1.3
+    
+    reach_1p = (1 - math.exp(-l_impact)) * 100
     capacity = 60 if m_type == "Urban" else 35
-    sov = (l_final / (capacity * weeks)) * 100
+    sov = (l_impact / (capacity * weeks)) * 100
     
     base_ecpm = 175 if m_type == "Urban" else 105
     dynamic_ecpm = base_ecpm * (1 + (sov / 100))
@@ -117,11 +121,9 @@ def calculate_physics(reach_goal_n, n_plus, weeks, m_type):
     elif sov < 25: tier, color, impact = "DOMINANT", "#bc13fe", "Top of Mind dominance."
     else: tier, color, impact = "MONOPOLY", "#EF4444", "Category ownership."
     
-    return round(l_final, 1), round(reach_1p, 1), round(sov, 1), tier, color, impact, round(dynamic_ecpm, 2)
+    return round(l_impact, 1), round(reach_1p, 1), round(sov, 1), tier, color, impact, round(dynamic_ecpm, 2)
 
 # --- 5. TOP BAR & MODAL ---
-st.markdown('<p style="font-size:2.8rem; font-weight:900; color:white; margin-bottom:0;">VIRTUAL DIGITAL <span style="color:#00f2ff;">MEDIA TERMINAL</span></p>', unsafe_allow_html=True)
-
 @st.dialog("GLOSSARY & INTELLIGENCE LOGIC")
 def open_glossary():
     st.markdown("""
@@ -130,7 +132,8 @@ def open_glossary():
         The estimated total digital population. <b>Source:</b> IAMAI 2026 Internet in India Projection (950M Base).
         
         <span class="glossary-term">Actual Frequency</span>
-        The raw average exposure (Lambda) needed to break market noise. Solved via the Poisson distribution to satisfy the user's N+ tail goal.
+        The raw average exposure (Lambda) needed to break market noise. Solved via the <b>Poisson distribution</b> to satisfy the user's N+ tail goal.
+        [Image of Poisson distribution curve showing frequency of ad exposures]
         
         <span class="glossary-term">Reach @ 1+ (Derived)</span>
         Percentage of the audience touched at least once. <b>Formula:</b> $(1 - e^{-\lambda}) \\times 100$.
@@ -148,61 +151,24 @@ if st.button("🔍 OPEN GLOSSARY & LOGIC"):
 
 # --- 6. SIDEBAR ---
 with st.sidebar:
-    st.markdown("<h2 style='color:#00f2ff;'>PLANNING_COMMAND</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:#00f2ff; font-family:JetBrains Mono;'>PLANNING_COMMAND</h2>", unsafe_allow_html=True)
     m_type = st.radio("Market Type", ["Urban", "Rural"], horizontal=True)
     
     st.markdown("---")
     zone_options = ["8 Metros"] + list(INDIA_GEO_DATABASE.keys())
     sel_zones = st.multiselect("Select Zones", zone_options)
     
+    sel_districts = []
     if "8 Metros" in sel_zones:
-        sel_states = st.multiselect("Top 8 Metros", sorted(METROS))
-        sel_districts = sel_states
-    else:
+        sel_metros = st.multiselect("Top 8 Metros", sorted(METROS), default=METROS)
+        sel_districts.extend(sel_metros)
+    
+    # Filter out "8 Metros" to handle standard state/district selection
+    standard_zones = [z for z in sel_zones if z != "8 Metros"]
+    if standard_zones or (not sel_zones):
         avail_states = []
-        for z in (sel_zones if sel_zones else INDIA_GEO_DATABASE.keys()):
+        target_zones = standard_zones if standard_zones else INDIA_GEO_DATABASE.keys()
+        for z in target_zones:
             avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
-        sel_states = st.multiselect("Select States", sorted(list(set(avail_states))))
         
-        avail_districts = []
-        for z in INDIA_GEO_DATABASE:
-            for s in sel_states:
-                if s in INDIA_GEO_DATABASE[z]: avail_districts.extend(INDIA_GEO_DATABASE[z][s])
-        sel_districts = st.multiselect("Select Districts", sorted(avail_districts))
-    
-    st.markdown("---")
-    r_goal = st.slider("Reach Target % @ N+", 5, 95, 45)
-    n_eff = st.number_input("Freq Threshold (N+)", 1, 15, 4)
-    weeks = st.slider("Duration (Weeks)", 1, 12, 4)
-    execute = st.button("EXECUTE PLAN", use_container_width=True)
-
-# --- 7. MAIN DASHBOARD ---
-if execute:
-    freq, r1_perc, sov_val, tier, t_color, t_impact, dynamic_ecpm = calculate_physics(r_goal, n_eff, weeks, m_type)
-    
-    universe_base = 950000000 
-    geo_count = len(sel_districts) if sel_districts else (len(sel_states)*5 if sel_states else 1)
-    universe = int(universe_base * (geo_count / 1000) * 8) 
-    r1_abs = int(universe * (r1_perc / 100))
-    total_imps = int(r1_abs * freq)
-    est_budget = (total_imps / 1000) * dynamic_ecpm
-
-    st.markdown('<div class="section-header">CORE REACH METRICS</div>', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: st.markdown(f'<div class="metric-card"><div class="label">Digital Universe</div><div class="value">{universe:,}</div><div class="sub-value">Target TAM</div></div>', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="metric-card"><div class="label">Reach @ 1+</div><div class="value">{r1_perc}%</div><div class="sub-value">{r1_abs:,} People</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="metric-card"><div class="label">Actual Frequency</div><div class="value">{freq}</div><div class="sub-value">{total_imps:,} Total Imps</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="metric-card-impact"><div class="label">SOV & Impact</div><div class="value" style="color:{t_color};">{sov_val}%</div><div class="sov-badge" style="background:{t_color}">{tier}</div><div class="sub-value" style="color:#EEE;">{t_impact}</div></div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="section-header">FINANCIALS</div>', unsafe_allow_html=True)
-    f1, f2, f3, f4 = st.columns(4)
-    with f1: st.markdown(f'<div class="metric-card"><div class="label">Total Budget</div><div class="value">₹{int(est_budget):,}</div></div>', unsafe_allow_html=True)
-    with f2: st.markdown(f'<div class="metric-card"><div class="label">Dynamic eCPM</div><div class="value">₹{dynamic_ecpm}</div></div>', unsafe_allow_html=True)
-    with f3: st.markdown(f'<div class="metric-card"><div class="label">Cost / Unique</div><div class="value">₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}</div></div>', unsafe_allow_html=True)
-    with f4: st.markdown(f'<div class="metric-card-impact"><div class="label">Efficiency</div><div class="value">{"HIGH" if sov_val < 25 else "LOW"}</div></div>', unsafe_allow_html=True)
-
-    
-    
-
-else:
-    st.info("System Ready. Adjust inputs in the sidebar and execute to view the tailored media plan.")
+        sel_states = st.multiselect("Select States", sorted(list(set(avail_states))))
