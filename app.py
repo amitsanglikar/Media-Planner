@@ -5,16 +5,15 @@ import plotly.graph_objects as go
 # --- 1. SYSTEM CONFIGURATION ---
 st.set_page_config(page_title="Media Intelligence Terminal", layout="wide", page_icon="🏛️")
 
-# --- 2. ELITE-UI CSS (SaaS Dark Theme) ---
+# --- 2. ELITE-UI CSS (SaaS Terminal Theme) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;800&display=swap');
     .stApp { background-color: #020617 !important; font-family: 'Inter', sans-serif !important; }
     
-    [data-testid="stSidebar"] { background-color: #0F172A !important; border-right: 1px solid #1E293B; }
+    [data-testid="stSidebar"] { background-color: #0F172A !important; border-right: 1px solid #1E293B; min-width: 350px !important; }
     [data-testid="stSidebar"] .stWidgetLabel p, 
     [data-testid="stSidebar"] label, 
-    [data-testid="stSidebar"] .stMarkdown p,
     [data-testid="stSidebar"] h2 {
         color: #F8FAFC !important; 
         font-weight: 600 !important;
@@ -26,15 +25,20 @@ st.markdown("""
         box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.3);
     }
     
-    .label-text { color: #94A3B8; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
-    .value-text { color: #F8FAFC; font-size: 2.3rem; font-weight: 800; margin-top: 8px; }
-    .sub-text { color: #3B82F6; font-size: 0.8rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .label-text { color: #94A3B8; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
+    .value-text { color: #F8FAFC; font-size: 2.1rem; font-weight: 800; margin-top: 4px; }
+    .sub-text { color: #3B82F6; font-size: 0.75rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
     
     .stButton>button {
         background: linear-gradient(90deg, #2563EB 0%, #3B82F6 100%) !important;
         border: none !important; border-radius: 8px !important; color: white !important;
         font-weight: 800 !important; height: 3.5rem !important; width: 100%; transition: 0.3s;
     }
+    
+    /* Table Styling */
+    .stTable { background: rgba(30, 41, 59, 0.2); border-radius: 12px; }
+    th { color: #3B82F6 !important; text-transform: uppercase; font-size: 0.7rem !important; }
+    td { color: #F8FAFC !important; font-size: 0.9rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -80,13 +84,12 @@ INDIA_GEO_DATABASE = {
     }
 }
 
-# --- 4. SIDEBAR LOGIC (PERMANENTLY LOCKED) ---
+# --- 4. SIDEBAR INPUTS (LOCKED STATUS) ---
 with st.sidebar:
-    st.markdown("<h2 style='color:white;'>Targeting Command</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:white;'>Media Control</h2>", unsafe_allow_html=True)
     m_type = st.radio("Market Classification", ["Overall", "Urban", "Rural"], horizontal=True)
     st.markdown("---")
 
-    # Cascading Selection Logic
     sel_zones = st.multiselect("1. Select Zones", list(INDIA_GEO_DATABASE.keys()))
     
     avail_states = []
@@ -107,53 +110,47 @@ with st.sidebar:
     sel_nccs = st.multiselect("Income (NCCS)", ["A", "B", "C", "D", "E"], default=["A", "B"])
     
     st.markdown("---")
-    # NEW KPI INPUTS
     exp_reach = st.slider("Expected Reach %", 5, 100, 45, step=5)
     eff_freq = st.number_input("Effective Frequency (N+)", 1, 15, 3)
     
+    st.markdown("---")
     run_calc = st.button("EXECUTE ANALYSIS")
 
-# --- 5. MAIN DASHBOARD ---
+# --- 5. MAIN DASHBOARD OUTPUT ---
 st.markdown("<h1 style='color:white; letter-spacing:-1px;'>Digital Media <span style='color:#3B82F6;'>Terminal 2026</span></h1>", unsafe_allow_html=True)
-st.markdown("<p style='color:#64748B;'>Standardized Intelligence Engine • Figures in '000s</p>", unsafe_allow_html=True)
 
 if run_calc:
-    # DATA ENGINE
-    INDIA_UNIVERSE = 958000
-    state_ratio = (len(sel_states) / 36) if sel_states else 1.0
-    dist_ratio = (len(sel_districts) / max(1, len(avail_districts))) if sel_districts else 1.0
+    # --- CALCULATION ENGINE ---
+    INDIA_BASE_UNIVERSE = 958000 # Population in '000s
     
-    market_pot = int(INDIA_UNIVERSE * state_ratio * dist_ratio)
+    # Geographic Weighting
+    state_factor = (len(sel_states) / 36) if sel_states else 1.0
+    dist_factor = (len(sel_districts) / 766) if sel_districts else 1.0 
+    market_potential = int(INDIA_BASE_UNIVERSE * state_factor * dist_factor)
+    
+    # Digital Ceiling (2026 Market Estimates)
+    pen_map = {"Urban": 0.75, "Rural": 0.52, "Overall": 0.64}
+    active_digital_u = int(market_potential * pen_map[m_type])
+    
+    # Demographic Scaling
     age_weights = {"15-24": 0.38, "25-34": 0.32, "35-44": 0.18, "45+": 0.12}
-    qual_u = int(market_pot * sum([age_weights[a] for a in sel_age]) * (len(sel_nccs)*0.2))
-    planned_reach_abs = int(qual_u * (exp_reach / 100))
-
-    # KPI GRID
-    c1, c2, c3, c4 = st.columns(4)
-    c1.markdown(f'<div class="metric-card"><div class="label-text">Qualified Target</div><div class="value-text">{qual_u:,}</div><div class="sub-text">Audience Base</div></div>', unsafe_allow_html=True)
-    c2.markdown(f'<div class="metric-card"><div class="label-text">Planned Reach</div><div class="value-text">{planned_reach_abs:,}</div><div class="sub-text">{exp_reach}% Coverage</div></div>', unsafe_allow_html=True)
-    c3.markdown(f'<div class="metric-card"><div class="label-text">Freq Goal</div><div class="value-text">{eff_freq}x</div><div class="sub-text">Effective N+</div></div>', unsafe_allow_html=True)
-    c4.markdown(f'<div class="metric-card"><div class="label-text">Impressions</div><div class="value-text">{(planned_reach_abs * eff_freq):,}</div><div class="sub-text">Total Volume</div></div>', unsafe_allow_html=True)
-
+    qual_u = int(active_digital_u * sum([age_weights[a] for a in sel_age]) * (len(sel_nccs) * 0.2))
     
+    # DYNAMIC FREQUENCY CALCULATION (Weighted Average)
+    # Average Freq = Goal N+ * (Dynamic curve based on Reach goal)
+    base_goal = eff_freq
+    calculated_avg_freq = round(base_goal * (1 + (exp_reach / 250)), 1)
+    
+    # Final Campaign Metrics
+    planned_reach_abs = int(qual_u * (exp_reach / 100))
+    gross_impressions_000 = int(planned_reach_abs * calculated_avg_freq)
 
-    # DEPLOYMENT FUNNEL
-    st.markdown("<br><div class='metric-card'>", unsafe_allow_html=True)
-    st.markdown("<p class='label-text' style='text-align:center;'>Audience Sizing Funnel</p>", unsafe_allow_html=True)
-    fig = go.Figure(go.Funnel(
-        y=["Market Potential", "Qualified Target", "Planned Reach"],
-        x=[market_pot, qual_u, planned_reach_abs],
-        textinfo="value+percent initial",
-        marker={"color": ["#1E293B", "#3B82F6", "#60A5FA"], "line": {"width": 2, "color": "white"}}
-    ))
-    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="#94A3B8"), height=400, margin=dict(t=20, b=20))
-    st.plotly_chart(fig, use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-else:
-    st.markdown("""
-        <div style='text-align:center; padding-top:100px;'>
-            <h3 style='color:#334155;'>SYSTEM READY</h3>
-            <p style='color:#64748B;'>Geography locked. Adjust targeting parameters and click EXECUTE.</p>
-        </div>
-    """, unsafe_allow_html=True)
+    # --- TOP METRIC ROW ---
+    c1, c2, c3, c4 = st.columns(4)
+    
+    with c1:
+        st.markdown(f'''<div class="metric-card"><div class="label-text">Qualified Target</div><div class="value-text">{qual_u:,}</div><div class="sub-text">Universe ('000)</div></div>''', unsafe_allow_html=True)
+    with c2:
+        st.markdown(f'''<div class="metric-card"><div class="label-text">Planned Reach</div><div class="value-text">{planned_reach_abs:,}</div><div class="sub-text">{exp_reach}% Reach Goal</div></div>''', unsafe_allow_html=True)
+    with c3:
+        st.markdown(f'''<div class="metric-card"><div class="label-text">Avg. Frequency</div><div class="value-text" style="color:#60A5FA;">
