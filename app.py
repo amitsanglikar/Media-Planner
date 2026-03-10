@@ -153,4 +153,55 @@ if run_calc:
     with c2:
         st.markdown(f'''<div class="metric-card"><div class="label-text">Planned Reach</div><div class="value-text">{planned_reach_abs:,}</div><div class="sub-text">{exp_reach}% Reach Goal</div></div>''', unsafe_allow_html=True)
     with c3:
-        st.markdown(f'''<div class="metric-card"><div class="label-text">Avg. Frequency</div><div class="value-text" style="color:#60A5FA;">
+        st.markdown(f'''<div class="metric-card"><div class="label-text">Avg. Frequency</div><div class="value-text" style="color:#60A5FA;">{calculated_avg_freq}x</div><div class="sub-text">Weighted {base_goal}+ Goal</div></div>''', unsafe_allow_html=True)
+    with c4:
+        st.markdown(f'''<div class="metric-card"><div class="label-text">Gross Impressions</div><div class="value-text">{gross_impressions_000:,}</div><div class="sub-text">Total Volume ('000)</div></div>''', unsafe_allow_html=True)
+
+    # --- AUDIENCE QUALIFICATION TABLE ---
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+    st.markdown("<p class='label-text'>Audience Qualification Lifecycle</p>", unsafe_allow_html=True)
+    
+    table_data = {
+        "Funnel Stage": [
+            "1. Market Potential (Total Pop)", 
+            "2. Active Digital Universe", 
+            "3. Qualified Target (Age/Income)", 
+            "4. Planned Campaign Reach"
+        ],
+        "Audience Size ('000)": [
+            f"{market_potential:,}", 
+            f"{active_digital_u:,}", 
+            f"{qual_u:,}", 
+            f"{planned_reach_abs:,}"
+        ],
+        "Index %": [
+            "100%", 
+            f"{pen_map[m_type]*100:.0f}%", 
+            f"{(qual_u/active_digital_u)*100:.1f}%", 
+            f"{exp_reach}%"
+        ]
+    }
+    st.table(pd.DataFrame(table_data))
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    
+
+    # --- GEOGRAPHIC CONTRIBUTION ---
+    if sel_states:
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<p class='label-text'>Regional Concentration Map</p>", unsafe_allow_html=True)
+        # Simplified contribution bar for clarity
+        geo_df = pd.DataFrame({
+            "State": sel_states,
+            "Target Density (%)": [round(100/len(sel_states), 1)] * len(sel_states)
+        })
+        st.bar_chart(geo_df.set_index("State"))
+
+else:
+    st.markdown("""
+        <div style='text-align:center; padding-top:100px;'>
+            <h3 style='color:#334155;'>TERMINAL STANDBY</h3>
+            <p style='color:#64748B;'>Geography and Inputs Locked. Click EXECUTE to generate media plan data.</p>
+        </div>
+    """, unsafe_allow_html=True)
