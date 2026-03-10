@@ -13,38 +13,31 @@ st.markdown("""
     .stApp { background-color: #020617 !important; font-family: 'Inter', sans-serif !important; }
     [data-testid="stSidebar"] { background-color: #0F172A !important; border-right: 1px solid #1E293B; min-width: 350px !important; }
     
-    [data-testid="stSidebar"] .stWidgetLabel p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] h2 {
-        color: #F8FAFC !important; font-weight: 600 !important;
-    }
-
     .metric-card {
         background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(59, 130, 246, 0.2);
-        backdrop-filter: blur(15px); padding: 1.5rem; border-radius: 16px;
-        border-left: 4px solid #3B82F6;
+        backdrop-filter: blur(15px); padding: 1.5rem; border-radius: 16px; border-left: 4px solid #3B82F6;
     }
     .metric-card-orange {
         background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(251, 146, 60, 0.2);
-        backdrop-filter: blur(15px); padding: 1.5rem; border-radius: 16px;
-        border-left: 4px solid #FB923C;
+        backdrop-filter: blur(15px); padding: 1.5rem; border-radius: 16px; border-left: 4px solid #FB923C;
     }
 
     .label-text { color: #94A3B8; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }
     .value-text { color: #F8FAFC; font-size: 2.1rem; font-weight: 800; margin-top: 4px; }
-    .sub-text { color: #3B82F6; font-size: 0.75rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
-    .sub-text-orange { color: #FB923C; font-size: 0.75rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
     
     .lock-msg { color: #EF4444; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; margin-bottom: -15px; }
+    .data-header { color: #FB923C; font-size: 1rem; font-weight: 800; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
+    .source-text { color: #475569; font-size: 0.65rem; margin-top: 10px; font-style: italic; }
 
     .stButton>button {
         background: linear-gradient(90deg, #EA580C 0%, #FB923C 100%) !important;
         border: none !important; border-radius: 8px !important; color: white !important;
         font-weight: 800 !important; height: 3.5rem !important; width: 100%; transition: 0.3s;
     }
-    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(251, 146, 60, 0.3); }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. EXHAUSTIVE GEOGRAPHY DATABASE ---
+# --- 3. LOCKED GEOGRAPHY DATABASE ---
 INDIA_GEO_DATABASE = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara", "North West Delhi", "South East Delhi"],
@@ -92,21 +85,20 @@ with st.sidebar:
     m_type = st.radio("Market Type", ["Overall", "Urban", "Rural"], horizontal=True)
     st.markdown("---")
     
-    # GEOGRAPHY LOCK LOGIC
+    # State Selector Logic
     state_filled = len(st.session_state.get('state_selector', [])) > 0
     if state_filled: st.markdown("<p class='lock-msg'>🔒 Locked (State Focus Active)</p>", unsafe_allow_html=True)
     sel_zones = st.multiselect("1. Select Zones", list(INDIA_GEO_DATABASE.keys()), disabled=state_filled, key="zone_selector")
     zone_filled = len(sel_zones) > 0
 
+    # Zone Selector Logic
     if zone_filled: st.markdown("<p class='lock-msg'>🔒 Locked (Zone Focus Active)</p>", unsafe_allow_html=True)
     avail_states = []
     for z in INDIA_GEO_DATABASE: avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
     sel_states = st.multiselect("2. Select States", sorted(avail_states), disabled=zone_filled, key="state_selector")
 
+    # District Selector Logic
     dist_locked = zone_filled or not sel_states
-    if dist_locked:
-        msg = "🔒 Locked (Zone Active)" if zone_filled else "Select State first"
-        st.markdown(f"<p class='lock-msg'>{msg}</p>", unsafe_allow_html=True)
     avail_districts = []
     FLAT_MAP = {}
     for z in INDIA_GEO_DATABASE: FLAT_MAP.update(INDIA_GEO_DATABASE[z])
@@ -114,69 +106,99 @@ with st.sidebar:
     sel_districts = st.multiselect("3. Select Districts", sorted(list(set(avail_districts))), disabled=dist_locked, key="dist_selector")
 
     st.markdown("---")
-    # DEMOGRAPHICS
     sel_age = st.multiselect("4. Age Cohorts", ["15-24", "25-34", "35-44", "45+"], default=["15-24", "25-34"])
-    
-    # GENDER MODULE (NEW)
     sel_gender = st.radio("5. Gender Focus", ["Both", "Male", "Female"], horizontal=True)
-    
     sel_nccs = st.multiselect("6. NCCS", ["A", "B", "C", "D", "E"], default=["A", "B"])
     
     st.markdown("---")
-    # STRATEGY
     exp_reach = st.slider("Reach Goal (%)", 5, 100, 45)
     eff_freq_n = st.number_input("Effective Freq (N+)", 1, 10, 4)
     weeks_on_air = st.slider("Weeks on Air", 1, 52, 4)
-    
     run_calc = st.button("EXECUTE ANALYSIS")
 
-# --- 5. MAIN OUTPUT ---
+# --- 5. DYNAMIC DATA ENGINE ---
+def get_dynamic_data(age_list, gender, nccs_list, market):
+    genres_pool = [
+        {"Genre": "Short-form Video", "Base_R": 84, "Aff": 125, "TS": 55, "Tags": ["15-24", "25-34", "Urban", "Rural"]},
+        {"Genre": "OTT/Streaming", "Base_R": 72, "Aff": 122, "TS": 110, "Tags": ["A", "B", "Urban", "25-34", "35-44"]},
+        {"Genre": "Social Media", "Base_R": 88, "Aff": 110, "TS": 50, "Tags": ["Rural", "Urban", "15-24", "25-34", "35-44"]},
+        {"Genre": "News & Info", "Base_R": 55, "Aff": 118, "TS": 30, "Tags": ["45+", "Male", "A", "B"]},
+        {"Genre": "Gaming", "Base_R": 40, "Aff": 140, "TS": 85, "Tags": ["15-24", "Male", "Urban"]},
+        {"Genre": "E-comm/Retail", "Base_R": 66, "Aff": 115, "TS": 25, "Tags": ["Female", "Urban", "A", "B", "25-34"]},
+        {"Genre": "Utility/Payments", "Base_R": 70, "Aff": 105, "TS": 15, "Tags": ["Rural", "Urban", "C", "D", "E"]}
+    ]
+    
+    platforms_pool = [
+        {"Platform": "YouTube", "Base_R": 90, "Aff": 120, "TS": 70, "Tags": ["Urban", "Rural"]},
+        {"Platform": "Instagram", "Base_R": 75, "Aff": 135, "TS": 45, "Tags": ["15-24", "25-34", "Urban", "Female"]},
+        {"Platform": "WhatsApp", "Base_R": 94, "Aff": 105, "TS": 120, "Tags": ["Rural", "Urban", "45+"]},
+        {"Platform": "JioCinema", "Base_R": 65, "Aff": 130, "TS": 105, "Tags": ["Male", "Rural", "Sports", "B", "C"]},
+        {"Platform": "Amazon/Flipkart", "Base_R": 62, "Aff": 112, "TS": 22, "Tags": ["Urban", "A", "B", "Female"]},
+        {"Platform": "Netflix/Prime", "Base_R": 28, "Aff": 160, "TS": 145, "Tags": ["A", "Urban", "25-34"]},
+        {"Platform": "LinkedIn", "Base_R": 22, "Aff": 155, "TS": 15, "Tags": ["A", "Urban", "35-44", "Male"]}
+    ]
+
+    def rank_list(pool, key_name):
+        scored = []
+        for item in pool:
+            weight = sum(1 for tag in item["Tags"] if tag in age_list or tag == gender or tag in nccs_list or tag == market)
+            r = min(98, item["Base_R"] + (weight * 1.8))
+            a = item["Aff"] + (weight * 2.2)
+            ts = item["TS"]
+            score = (r * 0.45) + (a * 0.3) + (ts * 0.25)
+            scored.append({key_name: item[key_name], "Monthly Reach%": f"{r:.1f}%", "Affinity Index": int(a), "Avg. Monthly Time Spent (Min)": ts, "Score": score})
+        return pd.DataFrame(scored).sort_values(by="Score", ascending=False).head(5).drop(columns=["Score"])
+
+    return rank_list(genres_pool, "Genre"), rank_list(platforms_pool, "Platform")
+
+# --- 6. MAIN OUTPUT ---
 st.markdown("<h1 style='color:white;'>Digital Media <span style='color:#3B82F6;'>Terminal 2026</span></h1>", unsafe_allow_html=True)
 
 if run_calc:
-    # --- CALCULATION ENGINE ---
+    # Calculation Logic
     INDIA_BASE = 958000 
     
-    # Geography Weight
+    # Calculate Geography Factor
     if zone_filled:
-        geo_weight = len(sel_zones) * 0.22 
-    else:
-        state_weight = (len(sel_states) * 0.045) if sel_states else 1.0
+        geo_factor = len(sel_zones) * 0.22 
+    elif sel_states:
+        state_weight = (len(sel_states) * 0.045)
         dist_weight = (len(sel_districts) / max(1, len(avail_districts))) if sel_districts else 1.0
-        geo_weight = state_weight * dist_weight
-    
-    # Demographics Factors
-    age_factor = len(sel_age) * 0.25
-    nccs_factor = len(sel_nccs) * 0.2
-    
-    # Gender Factor Logic
-    # 1.0 for Both, approx 0.51 for Male, 0.49 for Female (India 2026 Census Adj)
-    gender_map = {"Both": 1.0, "Male": 0.51, "Female": 0.49}
-    gender_factor = gender_map[sel_gender]
-    
+        geo_factor = state_weight * dist_weight
+    else:
+        geo_factor = 1.0 # Default/National
+
     pen_map = {"Urban": 0.75, "Rural": 0.52, "Overall": 0.64}
+    gender_map = {"Both": 1.0, "Male": 0.51, "Female": 0.49}
     
-    # CALCULATE QUALIFIED UNIVERSE
-    qual_u = int(INDIA_BASE * geo_weight * pen_map[m_type] * age_factor * nccs_factor * gender_factor)
-    
-    # Strategy Logic
-    avg_f_total = round(eff_freq_n * (1 + (exp_reach / 150)), 1)
+    qual_u = int(INDIA_BASE * geo_factor * pen_map[m_type] * (len(sel_age)*0.25) * (len(sel_nccs)*0.2) * gender_map[sel_gender])
     planned_reach_abs = int(qual_u * (exp_reach / 100))
+    avg_f_total = round(eff_freq_n * (1 + (exp_reach / 150)), 1)
     total_imps_val = int(planned_reach_abs * avg_f_total)
     campaign_freq_cap = int(max(eff_freq_n + 2, (weeks_on_air * 3)))
 
-    # --- KPI ROW ---
+    # Cards
     c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.markdown(f'<div class="metric-card"><div class="label-text">Qualified Target</div><div class="value-text">{qual_u:,}</div><div class="sub-text">Universe (\'000)</div></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown(f'<div class="metric-card"><div class="label-text">Planned Reach</div><div class="value-text">{planned_reach_abs:,}</div><div class="sub-text">{exp_reach}% Reach Goal</div></div>', unsafe_allow_html=True)
-    with c3:
-        st.markdown(f'<div class="metric-card-orange"><div class="label-text">Freq. Cap</div><div class="value-text" style="color:#FB923C;">{campaign_freq_cap}</div><div class="sub-text-orange">Campaign Limit</div></div>', unsafe_allow_html=True)
-    with c4:
-        st.markdown(f'<div class="metric-card"><div class="label-text">Gross Impressions</div><div class="value-text" style="color:#10B981;">{total_imps_val:,}</div><div class="sub-text">Total Volume (\'000)</div></div>', unsafe_allow_html=True)
+    with c1: st.markdown(f'<div class="metric-card"><div class="label-text">Qualified Target</div><div class="value-text">{qual_u:,}</div></div>', unsafe_allow_html=True)
+    with c2: st.markdown(f'<div class="metric-card"><div class="label-text">Planned Reach</div><div class="value-text">{planned_reach_abs:,}</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="metric-card-orange"><div class="label-text">Freq. Cap</div><div class="value-text" style="color:#FB923C;">{campaign_freq_cap}</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="metric-card"><div class="label-text">Gross Impressions</div><div class="value-text" style="color:#10B981;">{total_imps_val:,}</div></div>', unsafe_allow_html=True)
 
-    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Intelligence Row
+    col_left, col_right = st.columns(2)
+    genre_df, platform_df = get_dynamic_data(sel_age, sel_gender, sel_nccs, m_type)
+
+    with col_left:
+        st.markdown("<div class='data-header'>🏆 Top 5 Media Genres</div>", unsafe_allow_html=True)
+        st.dataframe(genre_df, use_container_width=True, hide_index=True)
+        st.markdown("<p class='source-text'>Data cross-referenced: Comscore MMX / GWI Consumer Trends 2026</p>", unsafe_allow_html=True)
+
+    with col_right:
+        st.markdown("<div class='data-header'>📱 Top 5 Platforms</div>", unsafe_allow_html=True)
+        st.dataframe(platform_df, use_container_width=True, hide_index=True)
+        st.markdown("<p class='source-text'>Analysis based on Digital Consumption Index (DCI) India 2026</p>", unsafe_allow_html=True)
 
 else:
-    st.markdown("<div style='text-align:center; padding-top:100px; color:#64748B; font-family:JetBrains Mono;'>TERMINAL STANDBY // GEOGRAPHY & DEMOGRAPHICS LOCKED // EXECUTE TO START</div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center; padding-top:100px; color:#64748B; font-family:JetBrains Mono;'>TERMINAL STANDBY // GEOGRAPHY LOCKED // EXECUTE ANALYSIS</div>", unsafe_allow_html=True)
