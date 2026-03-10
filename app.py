@@ -47,7 +47,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 3. THE PERMANENT MASTER DATABASE ---
-# Grouped by Region for better UX filtering
 INDIA_REGIONAL_DATA = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara"],
@@ -93,6 +92,13 @@ INDIA_REGIONAL_DATA = {
 
 METRO_DATA = {"Mumbai": 0.065, "Delhi": 0.072, "Bengaluru": 0.048, "Chennai": 0.038, "Kolkata": 0.035, "Hyderabad": 0.042, "Ahmedabad": 0.028, "Pune": 0.031}
 
+GENRE_BENCHMARKS = pd.DataFrame({
+    "Genre": ["Short-Form Video", "OTT Entertainment", "Social Networking", "Gaming", "Music Streaming", "News", "E-commerce", "Education", "Sports", "Finance"],
+    "Reach%": ["88%", "72%", "85%", "60%", "55%", "48%", "65%", "30%", "42%", "25%"],
+    "Affinity Index": [115, 130, 105, 110, 120, 145, 110, 160, 135, 185],
+    "Daily Time (Min)": [45, 55, 40, 35, 50, 15, 12, 25, 90, 8]
+})
+
 # --- 4. SIDEBAR COMMAND CENTER ---
 with st.sidebar:
     st.markdown("<h2 style='color:white;'>Targeting Command</h2>", unsafe_allow_html=True)
@@ -108,7 +114,7 @@ with st.sidebar:
     
     if is_metro: st.markdown("<span class='lock-msg'>Locked by Metro Focus</span>", unsafe_allow_html=True)
     
-    # NEW: Region filter for better UX
+    # Regional Filtering
     sel_regions = st.multiselect("Region Filter", list(INDIA_REGIONAL_DATA.keys()), disabled=is_metro)
     
     available_states = []
@@ -119,7 +125,6 @@ with st.sidebar:
         
     sel_states = st.multiselect("States/UTs", sorted(available_states), disabled=is_metro)
     
-    # Flatten master for district search
     FLAT_MASTER = {}
     for r in INDIA_REGIONAL_DATA: FLAT_MASTER.update(INDIA_REGIONAL_DATA[r])
     
@@ -138,88 +143,95 @@ with st.sidebar:
 
 # --- 5. MAIN DASHBOARD ---
 st.markdown("<h1 style='color:white; letter-spacing:-1px;'>Digital Media <span style='color:#3B82F6;'>Terminal 2026</span></h1>", unsafe_allow_html=True)
-st.markdown("<p style='color:#64748B;'>Standardized Intelligence Engine • Figures in '000s</p>", unsafe_allow_html=True)
 
-if run_calc:
-    TOTAL_INDIA_DIGITAL = 958000
-    
-    if is_metro:
-        geo_weight = sum([METRO_DATA[m] for m in sel_metros])
-        market_label = "Metro Targeted"
-    elif lock_geo:
-        state_base = (len(sel_states) * 0.038) if sel_states else 1.0
-        geo_weight = state_base * (0.43 if m_type == "Urban" else 0.57)
-        market_label = f"{m_type} Segment"
-    else:
-        # Overall mode defaults to full India when no state/district filters are selected.
-        if not sel_states:
-            geo_weight = 1.0
-            market_label = "Overall India"
+tab_calc, tab_bench = st.tabs(["🎯 Custom Campaign Planner", "📊 Market Benchmarks"])
+
+with tab_calc:
+    if run_calc:
+        TOTAL_INDIA_DIGITAL = 958000
+        
+        if is_metro:
+            geo_weight = sum([METRO_DATA[m] for m in sel_metros])
+            market_label = "Metro Targeted"
+        elif lock_geo:
+            state_base = (len(sel_states) * 0.038) if sel_states else 1.0
+            geo_weight = state_base * (0.43 if m_type == "Urban" else 0.57)
+            market_label = f"{m_type} Segment"
         else:
-            geo_weight = len(sel_states) * 0.038
-            if sel_districts:
-                geo_weight *= (len(sel_districts) / max(1, len(available_districts)))
-                market_label = "District Focus"
+            if not sel_states:
+                geo_weight = 1.0
+                market_label = "Overall India"
             else:
-                market_label = "State Focus"
+                geo_weight = len(sel_states) * 0.038
+                if sel_districts:
+                    geo_weight *= (len(sel_districts) / max(1, len(available_districts)))
+                    market_label = "District Focus"
+                else:
+                    market_label = "State Focus"
 
-    # Keep weight within valid bounds.
-    geo_weight = max(0.0, min(geo_weight, 1.0))
+        geo_weight = max(0.0, min(geo_weight, 1.0))
+        market_size = int(TOTAL_INDIA_DIGITAL * geo_weight)
+        
+        age_map = {"15-24": 0.38, "25-34": 0.32, "35-44": 0.18, "45+": 0.12}
+        age_w = sum([age_map.get(a) for a in sel_age])
+        nccs_w = len(sel_nccs) * 0.20
+        final_u = int(market_size * age_w * nccs_w)
 
-    market_size = int(TOTAL_INDIA_DIGITAL * geo_weight)
-    
-    # Demographic Filtering Logic
-    age_map = {"15-24": 0.38, "25-34": 0.32, "35-44": 0.18, "45+": 0.12}
-    age_w = sum([age_map.get(a) for a in sel_age])
-    nccs_w = len(sel_nccs) * 0.20
-    final_u = int(market_size * age_w * nccs_w)
+        if "45+" in sel_age and len(sel_age) == 1: mix = [0.60, 0.10, 0.20, 0.10]
+        elif "15-24" in sel_age: mix = [0.30, 0.55, 0.05, 0.10]
+        else: mix = [0.40, 0.35, 0.15, 0.10]
 
-    # DYNAMIC MEDIA OPTIMIZER (UX FIX)
-    if "45+" in sel_age and len(sel_age) == 1:
-        mix = [0.60, 0.10, 0.20, 0.10] # Heavy YouTube/CTV for older
-    elif "15-24" in sel_age:
-        mix = [0.30, 0.55, 0.05, 0.10] # Heavy Meta for younger
+        c1, c2, c3, c4 = st.columns(4)
+        metrics = [
+            ("National AIU", f"{TOTAL_INDIA_DIGITAL:,}", "India Base"),
+            ("Market Potential", f"{market_size:,}", market_label),
+            ("Qualified Target", f"{final_u:,}", "Target Audience"),
+            ("Efficiency Score", f"{(final_u/max(1,market_size)*100):.1f}%", "Selection Ratio")
+        ]
+        for col, (lab, val, sub) in zip([c1, c2, c3, c4], metrics):
+            col.markdown(f"""<div class="metric-card"><div class="label-text">{lab}</div><div class="value-text">{val}</div><div class="sub-text">⚡ {sub}</div></div>""", unsafe_allow_html=True)
+
+        
+
+        st.markdown("<br><div class='metric-card'>", unsafe_allow_html=True)
+        st.markdown("<p class='label-text' style='text-align:center;'>Audience Sizing Funnel</p>", unsafe_allow_html=True)
+        fig_f = go.Figure(go.Funnel(
+            y=["National Universe", "Selected Market", "Qualified Audience"],
+            x=[TOTAL_INDIA_DIGITAL, market_size, final_u],
+            textinfo="value+percent initial",
+            marker={"color": ["#1E293B", "#3B82F6", "#60A5FA"], "line": {"width": 2, "color": "white"}}
+        ))
+        fig_f.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="#94A3B8"), height=400)
+        st.plotly_chart(fig_f, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("<br><p class='label-text'>Recommended Media Deployment (Optimized for Selected Age)</p>", unsafe_allow_html=True)
+        st.dataframe(pd.DataFrame({
+            "Channel": ["YouTube Shorts", "Meta (FB/IG)", "Smart TV", "Search"],
+            "Allocation": [f"{int(x*100)}%" for x in mix],
+            "Reach ('000)": [f"{int(final_u*x):,}" for x in mix],
+            "Objective": ["Awareness", "Engagement", "Impact", "Intent"]
+        }), use_container_width=True, hide_index=True)
+
     else:
-        mix = [0.40, 0.35, 0.15, 0.10] # Standard balance
+        st.markdown("""
+            <div style='text-align:center; padding-top:100px;'>
+                <h3 style='color:#334155;'>SYSTEM STANDBY</h3>
+                <p style='color:#64748B;'>Select Region/States and click EXECUTE to start the analysis.</p>
+            </div>
+        """, unsafe_allow_html=True)
 
-    # KPI GRID
-    c1, c2, c3, c4 = st.columns(4)
-    metrics = [
-        ("National AIU", f"{TOTAL_INDIA_DIGITAL:,}", "India Base"),
-        ("Market Potential", f"{market_size:,}", market_label),
-        ("Qualified Target", f"{final_u:,}", "Target Audience"),
-        ("Efficiency Score", f"{(final_u/max(1,market_size)*100):.1f}%", "Selection Ratio")
-    ]
-    for col, (lab, val, sub) in zip([c1, c2, c3, c4], metrics):
-        col.markdown(f"""<div class="metric-card"><div class="label-text">{lab}</div><div class="value-text">{val}</div><div class="sub-text">⚡ {sub}</div></div>""", unsafe_allow_html=True)
-
-    # HERO VISUAL: THE FUNNEL
-    st.markdown("<br><div class='metric-card'>", unsafe_allow_html=True)
-    st.markdown("<p class='label-text' style='text-align:center;'>Audience Sizing Funnel</p>", unsafe_allow_html=True)
+with tab_bench:
+    st.markdown("<br><p class='label-text'>National Media Genre Performance (2026)</p>", unsafe_allow_html=True)
+    st.dataframe(GENRE_BENCHMARKS, use_container_width=True, hide_index=True)
     
-    fig_f = go.Figure(go.Funnel(
-        y=["National Universe", "Selected Market", "Qualified Audience"],
-        x=[TOTAL_INDIA_DIGITAL, market_size, final_u],
-        textinfo="value+percent initial",
-        marker={"color": ["#1E293B", "#3B82F6", "#60A5FA"], "line": {"width": 2, "color": "white"}}
-    ))
-    fig_f.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="#94A3B8"), height=450, margin=dict(t=30, b=30))
-    st.plotly_chart(fig_f, use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # MEDIA MIX TABLE
-    st.markdown("<br><p class='label-text'>Recommended Media Deployment (Optimized for Selected Age)</p>", unsafe_allow_html=True)
-    st.dataframe(pd.DataFrame({
-        "Channel": ["YouTube Shorts", "Meta (FB/IG)", "Smart TV", "Search"],
-        "Allocation": [f"{int(x*100)}%" for x in mix],
-        "Reach ('000)": [f"{int(final_u*x):,}" for x in mix],
-        "Objective": ["Awareness", "Engagement", "Impact", "Intent"]
-    }), use_container_width=True, hide_index=True)
-
-else:
-    st.markdown("""
-        <div style='text-align:center; padding-top:100px;'>
-            <h3 style='color:#334155;'>SYSTEM STANDBY</h3>
-            <p style='color:#64748B;'>Select parameters and click EXECUTE to start the analysis.</p>
-        </div>
-    """, unsafe_allow_html=True)
+    
+    
+    st.markdown("<br><p class='label-text'>Top 10 Platform Reach & Dwell Time</p>", unsafe_allow_html=True)
+    PLATFORM_BENCHMARKS = pd.DataFrame({
+        "Platform": ["YouTube", "Instagram", "WhatsApp", "Disney+ Hotstar", "Facebook", "Netflix", "Amazon Prime", "JioCinema", "Spotify", "Snapchat"],
+        "Reach%": ["92%", "78%", "95%", "58%", "74%", "22%", "35%", "52%", "28%", "32%"],
+        "Affinity Index": [110, 125, 100, 140, 95, 210, 180, 115, 155, 140],
+        "Dwell Time (Min)": [48, 38, 42, 52, 30, 65, 45, 40, 55, 25]
+    })
+    st.dataframe(PLATFORM_BENCHMARKS, use_container_width=True, hide_index=True)
