@@ -18,28 +18,48 @@ except:
     st.error("Setup Error: Ensure GEMINI_API_KEY is in secrets.")
     st.stop()
 
-# --- 2. ELITE-UI STYLING ---
+# --- 2. ELITE-UI STYLING (THE TERMINAL LOOK) ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap');
     .stApp { background-color: #020617 !important; font-family: 'Inter', sans-serif !important; }
     [data-testid="stSidebar"] { background-color: #0F172A !important; border-right: 1px solid #1E293B; min-width: 380px !important; }
+    
+    /* Header Styling */
+    .main-title { font-size: 2.5rem; font-weight: 800; color: white; letter-spacing: -1px; margin-bottom: 0px; }
+    .sub-title { color: #3B82F6; font-family: 'JetBrains Mono'; font-size: 0.9rem; margin-bottom: 30px; text-transform: uppercase; }
+
+    /* Card Styling */
     .metric-card {
         background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(59, 130, 246, 0.2);
         padding: 1.5rem; border-radius: 12px; border-left: 4px solid #3B82F6; height: 100%;
+        backdrop-filter: blur(10px);
     }
     .metric-card-impact {
         background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(168, 85, 247, 0.2);
         padding: 1.5rem; border-radius: 12px; border-left: 4px solid #A855F7; height: 100%;
+        backdrop-filter: blur(10px);
     }
-    .label { color: #94A3B8; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
-    .value { color: #F8FAFC; font-size: 1.9rem; font-weight: 800; margin-top: 5px; }
-    .sub-value { font-size: 0.85rem; color: #64748B; margin-top: 5px; font-weight: 600; }
-    .sov-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; margin-top: 10px; display: inline-block; color: white; }
+    .label { color: #94A3B8; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+    .value { color: #F8FAFC; font-size: 2.2rem; font-weight: 800; margin-top: 5px; }
+    .sub-value { font-size: 0.85rem; color: #64748B; margin-top: 8px; font-weight: 600; display: block; }
+    
+    /* Badge Styling */
+    .sov-badge { 
+        padding: 6px 14px; border-radius: 6px; font-size: 0.7rem; font-weight: 900; 
+        margin-top: 12px; display: inline-block; color: white; letter-spacing: 1px;
+    }
+    
+    /* Table Headers */
+    .section-header {
+        background: linear-gradient(90deg, #1E293B 0%, transparent 100%);
+        padding: 10px 20px; border-radius: 4px; border-left: 3px solid #3B82F6;
+        color: #F8FAFC; font-weight: 700; margin: 25px 0 15px 0; font-size: 0.9rem;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. THE 2026 PAN-INDIA DATABASE ---
+# --- 3. DATABASE (FROZEN) ---
 INDIA_GEO_DATABASE = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara", "North West Delhi", "South East Delhi"],
@@ -81,105 +101,140 @@ INDIA_GEO_DATABASE = {
     }
 }
 
-# --- 4. THE PHYSICS ENGINE ---
+# --- 4. ENGINE: PHYSICS & BUDGET ---
 def calculate_physics(reach_goal_n, n_plus, weeks, m_type):
-    clutter = 1.35 if m_type == "Urban" else 1.15
-    memory_threshold = (11.5 / 4) * weeks * clutter
+    clutter = 1.45 if m_type == "Urban" else 1.20
+    memory_decay = (11.0 / 4) * weeks * clutter
     
-    # Solve for Average Freq (Lambda)
     l_final = 0
     for l in np.arange(0.1, 150.0, 0.1):
         r_at_n = (1 - stats.poisson.cdf(n_plus - 1, l)) * 100
         if r_at_n >= reach_goal_n:
-            l_final = max(l, memory_threshold)
+            l_final = max(l, memory_decay)
             break
             
-    # Derive 1+ Reach and SOV
     reach_1p = (1 - math.exp(-l_final)) * 100
-    capacity = 60 if m_type == "Urban" else 35
+    capacity = 55 if m_type == "Urban" else 30
     sov = (l_final / (capacity * weeks)) * 100
     
-    if sov < 5: tier, color, desc = "MAINTENANCE", "#64748B", "Low Share; Competitive Noise"
-    elif sov < 15: tier, color, desc = "CHALLENGER", "#3B82F6", "Solid Breakthrough; Meaningful Recall"
-    elif sov < 25: tier, color, desc = "DOMINANT", "#A855F7", "High Top-of-Mind Awareness"
-    else: tier, color, desc = "MONOPOLY", "#EF4444", "Category Ownership; Max Impact"
+    if sov < 7: tier, color, desc = "MAINTENANCE", "#64748B", "Competitive Parity"
+    elif sov < 18: tier, color, desc = "CHALLENGER", "#3B82F6", "Breakthrough Recall"
+    elif sov < 28: tier, color, desc = "DOMINANT", "#A855F7", "Market Authority"
+    else: tier, color, desc = "LEADER", "#EF4444", "Category Ownership"
     
     return round(l_final, 1), round(reach_1p, 1), round(sov, 1), tier, color, desc
 
-# --- 5. SIDEBAR COMMAND CENTER ---
+# --- 5. COMMAND CENTER SIDEBAR ---
 with st.sidebar:
+    st.image("https://img.icons8.com/ios-filled/100/3B82F6/radar.png", width=60)
     st.title("Campaign Command")
-    m_type = st.radio("Market Type", ["Urban", "Rural"], horizontal=True)
+    m_type = st.radio("Market Classification", ["Urban", "Rural"], horizontal=True)
     st.markdown("---")
     
-    sel_zones = st.multiselect("1. Select Zones", list(INDIA_GEO_DATABASE.keys()))
+    sel_zones = st.multiselect("Geography: Zones", list(INDIA_GEO_DATABASE.keys()))
     
     avail_states = []
-    if sel_zones:
-        for z in sel_zones: avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
-    else:
-        for z in INDIA_GEO_DATABASE: avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
-    
-    sel_states = st.multiselect("2. Select States", sorted(avail_states))
+    for z in (sel_zones if sel_zones else INDIA_GEO_DATABASE.keys()):
+        avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
+    sel_states = st.multiselect("Geography: States", sorted(avail_states))
     
     avail_districts = []
     if sel_states:
         for z in INDIA_GEO_DATABASE:
             for s in sel_states:
                 if s in INDIA_GEO_DATABASE[z]: avail_districts.extend(INDIA_GEO_DATABASE[z][s])
-    sel_districts = st.multiselect("3. Select Districts (Optional)", sorted(avail_districts))
+    sel_districts = st.multiselect("Geography: Districts (Filter)", sorted(avail_districts))
     
     st.markdown("---")
-    r_goal = st.slider("Reach Goal % @ N+", 5, 95, 45)
-    n_eff = st.number_input("N+ Effective Freq", 1, 15, 4)
-    weeks = st.slider("Duration (Weeks)", 1, 12, 4)
+    r_goal = st.slider("Reach Target % (Effective)", 5, 95, 45)
+    n_eff = st.number_input("Freq Threshold (N+)", 1, 15, 4)
+    weeks = st.slider("Campaign Duration (Weeks)", 1, 12, 4)
     
-    execute = st.button("EXECUTE IMPACT PHYSICS")
+    st.markdown("---")
+    execute = st.button("RUN IMPACT PROJECTION", use_container_width=True)
 
-# --- 6. MAIN DASHBOARD ---
-st.markdown("<h1 style='color:white;'>Media Impact <span style='color:#3B82F6;'>Terminal 2026</span></h1>", unsafe_allow_html=True)
+# --- 6. DASHBOARD MAIN VIEW ---
+st.markdown('<p class="main-title">Impact Media Terminal <span style="color:#3B82F6;">2026</span></p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">Advanced Reach & Share-of-Voice Physics Engine</p>', unsafe_allow_html=True)
 
 if execute:
-    freq, r1_perc, sov, tier, t_color, t_desc = calculate_physics(r_goal, n_eff, weeks, m_type)
+    freq, r1_perc, sov_val, tier, t_color, t_desc = calculate_physics(r_goal, n_eff, weeks, m_type)
     
-    # Universe Modeling (Dynamic based on Geography selection)
-    base_pop = 1200000 
-    geo_count = len(sel_districts) if sel_districts else (len(sel_states) * 10) if sel_states else 100
-    universe = int(base_pop * (geo_count / 100))
-    
+    # Advanced Geography Multiplier
+    base_pop = 1450000 
+    geo_scale = len(sel_districts) if sel_districts else (len(sel_states) * 12) if sel_states else 120
+    universe = int(base_pop * (geo_scale / 100))
     r1_abs = int(universe * (r1_perc / 100))
     total_imps = int(r1_abs * freq)
+    
+    # Estimated Cost Factor (Simulated)
+    cpm = 180 if m_type == "Urban" else 110
+    est_budget = (total_imps / 1000) * cpm
 
+    # ROW 1: CORE METRICS
     c1, c2, c3, c4 = st.columns(4)
     
     with c1:
-        st.markdown(f'''<div class="metric-card"><div class="label">Total Universe</div>
-        <div class="value">{universe:,}</div><div class="sub-value">Targeted Audience (TAM)</div></div>''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="metric-card"><div class="label">Total Universe (TAM)</div>
+        <div class="value">{universe:,}</div><div class="sub-value">Active Digital Population</div></div>''', unsafe_allow_html=True)
     with c2:
-        st.markdown(f'''<div class="metric-card"><div class="label">Reach @ 1+ (Derived)</div>
-        <div class="value">{r1_perc}%</div><div class="sub-value">{r1_abs:,} Unique Reached</div></div>''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="metric-card"><div class="label">Total Campaign Reach</div>
+        <div class="value">{r1_perc}%</div><div class="sub-value">{r1_abs:,} Unique Aud. Reached</div></div>''', unsafe_allow_html=True)
     with c3:
-        st.markdown(f'''<div class="metric-card"><div class="label">Actual Freq & Imps</div>
-        <div class="value">{freq} Freq</div><div class="sub-value">{total_imps:,} Total Impressions</div></div>''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="metric-card"><div class="label">Avg Freq & Impressions</div>
+        <div class="value">{freq}x</div><div class="sub-value">{total_imps:,} Total Ad Delivery</div></div>''', unsafe_allow_html=True)
     with c4:
-        st.markdown(f'''<div class="metric-card-impact"><div class="label">SOV & Market Impact</div>
-        <div class="value" style="color:{t_color};">{sov}%</div><div class="sov-badge" style="background:{t_color}">{tier}</div>
+        st.markdown(f'''<div class="metric-card-impact"><div class="label">Share of Voice (SOV)</div>
+        <div class="value" style="color:{t_color};">{sov_val}%</div><div class="sov-badge" style="background:{t_color}">{tier}</div>
         <div class="sub-value" style="color:#F8FAFC;">{t_desc}</div></div>''', unsafe_allow_html=True)
 
-    st.markdown("---")
-    
-    
+    # IMAGE TRIGGER: Visualizing Reach/Frequency Build
     
 
-    # AI Insight Bridge
+    # ROW 2: AI STRATEGY ENGINE
+    st.markdown('<div class="section-header">PLATFORM AFFINITY & GENRE PENETRATION (AI GEN-2 PROJECTION)</div>', unsafe_allow_html=True)
+    
     try:
-        prompt = f"Media Planner 2026 India. Market: {m_type}. State: {sel_states}. Freq: {freq}. SOV: {sov}%. Impact: {tier}. Return Python dict 'genres' and 'platforms' (Top 10)."
-        response = model.generate_content(prompt)
-        data = ast.literal_eval(re.search(r'\{.*\}', response.text, re.DOTALL).group())
-        cl, cr = st.columns(2)
-        with cl: st.dataframe(pd.DataFrame(data["genres"]), use_container_width=True, hide_index=True)
-        with cr: st.dataframe(pd.DataFrame(data["platforms"]), use_container_width=True, hide_index=True)
-    except:
-        st.warning("AI Insights Engine offline.")
+        # Specialized prompt for professional output
+        ai_prompt = (
+            f"As a 2026 India Media Strategist, provide a Top 10 Media Genres and Top 10 Media Platforms table "
+            f"for a {m_type} market with {sov_val}% Share of Voice. Context: {sel_states} geography. "
+            f"Columns for Genres: Genre, Reach%, Affinity, Index. "
+            f"Columns for Platforms: Platform, Daily Time Spent, Reach%, Growth. "
+            f"Return ONLY a Python dictionary object."
+        )
+        
+        with st.spinner("Synchronizing with 2026 Intelligence Nodes..."):
+            response = model.generate_content(ai_prompt)
+            clean_data = re.search(r'\{.*\}', response.text, re.DOTALL).group()
+            strategy_data = ast.literal_eval(clean_data)
+            
+            col_left, col_right = st.columns(2)
+            with col_left:
+                st.dataframe(pd.DataFrame(strategy_data["genres"]), 
+                             use_container_width=True, hide_index=True)
+            with col_right:
+                st.dataframe(pd.DataFrame(strategy_data["platforms"]), 
+                             use_container_width=True, hide_index=True)
+                             
+    except Exception as e:
+        st.error("AI Bridge Connectivity Issue. Verify API Key limits.")
+
+    # BUDGET & ALLOCATION SECTION
+    st.markdown('<div class="section-header">ESTIMATED MEDIA BUDGETING & KPI VALUE</div>', unsafe_allow_html=True)
+    b1, b2, b3 = st.columns(3)
+    with b1:
+        st.markdown(f'<div class="metric-card"><div class="label">Est. Budget Req.</div><div class="value">₹{int(est_budget):,}</div></div>', unsafe_allow_html=True)
+    with b2:
+        st.markdown(f'<div class="metric-card"><div class="label">Cost Per Reach (CPR)</div><div class="value">₹{round(est_budget/r1_abs, 2)}</div></div>', unsafe_allow_html=True)
+    with b3:
+        st.markdown(f'<div class="metric-card"><div class="label">Ad Clutter Resistance</div><div class="value">{"HIGH" if sov_val > 20 else "MEDIUM"}</div></div>', unsafe_allow_html=True)
+
 else:
-    st.info("System Ready. Select your markets and Breakthrough goals to begin.")
+    # STANDBY SCREEN
+    st.markdown("""
+    <div style="background: rgba(30, 41, 59, 0.2); padding: 100px; border-radius: 20px; border: 1px dashed #3B82F6; text-align: center;">
+        <p style="color: #64748B; font-family: 'JetBrains Mono';">SYSTEM STANDBY // WAITING FOR COMMAND PARAMETERS</p>
+        <p style="color: #3B82F6; font-size: 0.8rem;">Select Geography and Breakthrough Goals in the Sidebar to Execute Simulation.</p>
+    </div>
+    """, unsafe_allow_html=True)
