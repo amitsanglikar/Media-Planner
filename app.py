@@ -1,19 +1,18 @@
 import streamlit as st
 import pandas as pd
-import google.generativeai as genai
+from google import genai
 import math
 import numpy as np
 from scipy import stats
 
-# --- 1. SYSTEM CONFIG ---
-st.set_page_config(page_title="Impact Media Terminal 2026", layout="wide", page_icon="📡")
+# --- 1. SYSTEM & API CONFIG ---
+st.set_page_config(page_title="Breakthrough Media Terminal 2026", layout="wide", page_icon="📡")
 
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=API_key)
-    model = genai.GenerativeModel('gemini-2.0-flash') 
-except:
-    st.error("Setup Error: Ensure GEMINI_API_KEY is in secrets.")
+    client = genai.Client(api_key=API_KEY)
+except Exception as e:
+    st.error("Setup Error: Ensure GEMINI_API_KEY is configured in Streamlit Secrets.")
     st.stop()
 
 # --- 2. TERMINAL STYLING ---
@@ -43,7 +42,7 @@ st.markdown("""
     
     .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; margin-top: 10px; display: inline-block; color: white; text-transform: uppercase; }
     
-    .glossary-content { background: #0f172a; border: 1px solid #00f2ff; padding: 25px; border-radius: 15px; color: #f8fafc; line-height: 1.6; }
+    .glossary-content { color: #f8fafc; line-height: 1.6; }
     .glossary-term { color: #00f2ff; font-weight: 700; font-family: 'JetBrains Mono'; display: block; margin-top: 12px; }
     </style>
     """, unsafe_allow_html=True)
@@ -91,9 +90,10 @@ INDIA_GEO_DATABASE = {
 }
 METROS = ["Mumbai", "Delhi", "Bengaluru", "Kolkata", "Chennai", "Hyderabad", "Ahmedabad", "Pune"]
 
-# --- 4. ENGINE: BREAKTHROUGH LOGIC ---
+# --- 4. ENGINE: IMPACT PHYSICS ---
 def calculate_breakthrough_physics(reach_goal_n, n_plus, weeks, m_type):
     l_raw = 0
+    # Solver for Poisson Lambda
     for l in np.arange(0.1, 150.0, 0.1):
         if (stats.poisson.sf(n_plus - 1, l)) * 100 >= reach_goal_n:
             l_raw = l
@@ -102,7 +102,7 @@ def calculate_breakthrough_physics(reach_goal_n, n_plus, weeks, m_type):
     # Apply 1.3x Wastage Multiplier
     l_impact = l_raw * 1.3
     
-    # Impact Grade Logic
+    # 3-5-10-12 Frequency Grade
     if l_impact < 6: f_tier, f_color = "Forgettable", "#64748B"
     elif 6 <= l_impact < 10: f_tier, f_color = "Challenger", "#94a3b8"
     elif 10 <= l_impact <= 12: f_tier, f_color = "Sweet Spot", "#00f2ff"
@@ -115,30 +115,32 @@ def calculate_breakthrough_physics(reach_goal_n, n_plus, weeks, m_type):
     base_ecpm = 175 if m_type == "Urban" else 105
     dynamic_ecpm = base_ecpm * (1 + (sov / 100))
     
-    if sov < 5: s_tier, s_color, s_impact = "MAINTENANCE", "#64748B", "Low recall."
-    elif sov < 15: s_tier, s_color, s_impact = "CHALLENGER", "#00f2ff", "Solid breakthrough."
-    elif sov < 25: s_tier, s_color, s_impact = "DOMINANT", "#bc13fe", "Top of Mind."
-    else: s_tier, s_color, s_impact = "MONOPOLY", "#EF4444", "Category Ownership."
+    if sov < 5: s_tier, s_color = "MAINTENANCE", "#64748B"
+    elif sov < 15: s_tier, s_color = "CHALLENGER", "#00f2ff"
+    else: s_tier, s_color = "DOMINANT", "#bc13fe"
     
-    return round(l_impact, 1), f_tier, f_color, round(reach_1p, 1), round(sov, 1), s_tier, s_color, s_impact, round(dynamic_ecpm, 2)
+    return round(l_impact, 1), f_tier, f_color, round(reach_1p, 1), round(sov, 1), s_tier, s_color, round(dynamic_ecpm, 2)
 
-# --- 5. TOP BAR & MODAL ---
+# --- 5. TOP BAR & GLOSSARY MODAL ---
 st.markdown('<p style="font-size:2.8rem; font-weight:900; color:white; margin-bottom:0;">BREAKTHROUGH <span style="color:#00f2ff;">MEDIA TERMINAL</span></p>', unsafe_allow_html=True)
 
-@st.dialog("GLOSSARY & IMPACT LOGIC")
+@st.dialog("GLOSSARY & INTELLIGENCE LOGIC")
 def open_glossary():
     st.markdown("""
     <div class="glossary-content">
-        <span class="glossary-term">Actual Frequency (Breakthrough Adjusted)</span>
-        Derived from Poisson $\lambda$ multiplied by a <b>1.3x Wastage Buffer</b> to account for Indian market clutter and viewability gaps.
+        <span class="glossary-term">Actual Frequency (Impact-Weighted)</span>
+        Derived from Poisson Lambda ($\lambda$) and adjusted by a <b>1.3x Wastage Multiplier</b>. This accounts for ads that are rendered but not viewed in high-clutter Indian digital feeds.
         
-        <span class="glossary-term">3-5-10-12 Logic</span>
-        <b>< 6:</b> Forgettable threshold.<br>
-        <b>10-12:</b> Optimal Recall "Sweet Spot".<br>
-        <b>> 12:</b> High-Impact Dominance.
+        <span class="glossary-term">3-5-10-12 Breakthrough Logic</span>
+        <b>< 6.0:</b> Threshold of Forgetfulness. Ad recall is statistically negligible.<br>
+        <b>10.0-12.0:</b> Optimal Recall "Sweet Spot". Maximum efficiency for Aided Brand Awareness.<br>
+        <b>> 12.0:</b> Market Dominance. High Breakthrough velocity but risk of creative fatigue.
+        
+        <span class="glossary-term">Market SOV (Share of Voice)</span>
+        Campaign weight relative to total category inventory capacity (Urban: 60/wk, Rural: 35/wk).
         
         <span class="glossary-term">Dynamic eCPM</span>
-        Inventory pricing that inflates as Share of Voice (SOV) increases, simulating auction scarcity in high-demand zones.
+        SOV-adjusted pricing. Reflects the premium paid to secure higher inventory occupancy in a competitive auction.
     </div>
     """, unsafe_allow_html=True)
 
@@ -149,6 +151,7 @@ if st.button("🔍 OPEN GLOSSARY & LOGIC"):
 with st.sidebar:
     st.markdown("<h2 style='color:#00f2ff;'>PLANNING_COMMAND</h2>", unsafe_allow_html=True)
     m_type = st.radio("Market Type", ["Urban", "Rural"], horizontal=True)
+    
     st.markdown("---")
     zone_options = ["8 Metros"] + list(INDIA_GEO_DATABASE.keys())
     sel_zones = st.multiselect("Select Zones", zone_options)
@@ -174,38 +177,40 @@ with st.sidebar:
     weeks = st.slider("Duration (Weeks)", 1, 12, 4)
     execute = st.button("EXECUTE IMPACT PLAN", use_container_width=True)
 
-# --- 7. DASHBOARD OUTPUT ---
+# --- 7. MAIN DASHBOARD ---
 if execute:
-    freq, f_tier, f_color, r1_perc, sov_val, s_tier, s_color, s_impact, d_ecpm = calculate_breakthrough_physics(r_goal, n_eff, weeks, m_type)
+    freq, f_tier, f_color, r1_perc, sov_val, s_tier, s_color, d_ecpm = calculate_breakthrough_physics(r_goal, n_eff, weeks, m_type)
     
+    # Universe Calculation
     universe_base = 950000000 
     geo_count = len(sel_districts) if sel_districts else 1
-    universe = int(universe_base * (geo_count / 1000) * 8) 
+    universe = int(universe_base * (geo_count / 850) * 12) # Scaled for digital penetration
     r1_abs = int(universe * (r1_perc / 100))
     total_imps = int(r1_abs * freq)
     est_budget = (total_imps / 1000) * d_ecpm
 
-    st.markdown('<div class="section-header">CORE REACH METRICS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">CORE IMPACT METRICS</div>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.markdown(f'<div class="metric-card"><div class="label">Digital Universe</div><div class="value">{universe:,}</div><div class="sub-value">Target TAM</div></div>', unsafe_allow_html=True)
     with c2: st.markdown(f'<div class="metric-card"><div class="label">Reach @ 1+</div><div class="value">{r1_perc}%</div><div class="sub-value">{r1_abs:,} People</div></div>', unsafe_allow_html=True)
     
-    # NEW FREQUENCY CARD (Mirrors SOV Card)
+    # Frequency Card with Status Badge
     with c3: st.markdown(f'''
         <div class="metric-card-impact" style="border-left: 5px solid {f_color}; border-color: {f_color}33;">
             <div class="label">Actual Frequency</div>
             <div class="value" style="color:{f_color};">{freq}</div>
             <div class="status-badge" style="background:{f_color}">{f_tier}</div>
-            <div class="sub-value">Breakthrough weight incl. 1.3x Wastage Buffer</div>
+            <div class="sub-value">Incl. 1.3x Wastage Buffer</div>
         </div>
         ''', unsafe_allow_html=True)
     
+    # SOV Card with Status Badge
     with c4: st.markdown(f'''
         <div class="metric-card-impact" style="border-left: 5px solid {s_color}; border-color: {s_color}33;">
             <div class="label">Market SOV</div>
             <div class="value" style="color:{s_color};">{sov_val}%</div>
             <div class="status-badge" style="background:{s_color}">{s_tier}</div>
-            <div class="sub-value">{s_impact}</div>
+            <div class="sub-value">Inventory Occupancy</div>
         </div>
         ''', unsafe_allow_html=True)
 
@@ -214,10 +219,11 @@ if execute:
     with f1: st.markdown(f'<div class="metric-card"><div class="label">Total Budget</div><div class="value">₹{int(est_budget):,}</div></div>', unsafe_allow_html=True)
     with f2: st.markdown(f'<div class="metric-card"><div class="label">Impact eCPM</div><div class="value">₹{d_ecpm}</div></div>', unsafe_allow_html=True)
     with f3: st.markdown(f'<div class="metric-card"><div class="label">Cost / Unique</div><div class="value">₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}</div></div>', unsafe_allow_html=True)
-    with f4: st.markdown(f'<div class="metric-card-impact"><div class="label">Efficiency</div><div class="value">{"HIGH" if sov_val < 25 else "LOW"}</div></div>', unsafe_allow_html=True)
+    with f4: st.markdown(f'<div class="metric-card-impact"><div class="label">Efficiency</div><div class="value">{"HIGH" if sov_val < 15 else "STRETCHED"}</div></div>', unsafe_allow_html=True)
 
+    # Added Visual Intelligence for Frequency Distribution
     
     
 
 else:
-    st.info("Terminal Standby. Adjust inputs and Execute to calculate Breakthrough Impact.")
+    st.info("System Standby. Configure Planning Command and Execute to begin.")
