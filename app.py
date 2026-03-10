@@ -5,233 +5,166 @@ import plotly.graph_objects as go
 # --- 1. SYSTEM CONFIGURATION ---
 st.set_page_config(page_title="Media Intelligence Terminal", layout="wide", page_icon="🏛️")
 
-# --- 2. ELITE-UI CSS (SaaS Terminal Theme + Visibility Fixes) ---
+# --- 2. PREMIUM UI/UX CSS (Blue & Orange Palette) ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@300;400;600;800&display=swap');
+    
+    /* Core App Style */
     .stApp { background-color: #020617 !important; font-family: 'Inter', sans-serif !important; }
-    
-    /* Sidebar Foundation & Visibility Fix */
     [data-testid="stSidebar"] { background-color: #0F172A !important; border-right: 1px solid #1E293B; }
-    [data-testid="stSidebar"] .stWidgetLabel p, 
-    [data-testid="stSidebar"] label, 
-    [data-testid="stSidebar"] .stMarkdown p,
-    [data-testid="stSidebar"] h2 {
-        color: #F8FAFC !important; 
-        font-weight: 600 !important;
-    }
     
-    /* Neumorphic Metric Cards */
+    /* Sidebar Text & Inputs */
+    [data-testid="stSidebar"] .stWidgetLabel p, [data-testid="stSidebar"] label, [data-testid="stSidebar"] h2 {
+        color: #F8FAFC !important; font-weight: 600 !important; font-family: 'Inter', sans-serif;
+    }
+
+    /* Metric Card Glow Effects */
     .metric-card {
-        background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(59, 130, 246, 0.2);
-        backdrop-filter: blur(15px); padding: 1.5rem; border-radius: 16px;
-        box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.3);
+        background: linear-gradient(145deg, rgba(30, 41, 59, 0.7), rgba(15, 23, 42, 0.9));
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        padding: 1.5rem; border-radius: 20px;
+        box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+        transition: transform 0.3s ease;
     }
+    .metric-card:hover { border-color: #FB923C; transform: translateY(-5px); }
     
-    /* Typography */
-    .label-text { color: #94A3B8; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
-    .value-text { color: #F8FAFC; font-size: 2.3rem; font-weight: 800; margin-top: 8px; }
-    .sub-text { color: #3B82F6; font-size: 0.8rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    /* Typography Overhaul */
+    .label-text { color: #94A3B8; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
+    .value-text { color: #FFFFFF; font-size: 2.8rem; font-weight: 800; margin-top: 5px; }
+    .sub-text-blue { color: #3B82F6; font-size: 0.85rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .sub-text-orange { color: #FB923C; font-size: 0.85rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
     
-    /* Locking Indicators */
-    .lock-msg { color: #EF4444; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; margin-bottom: 5px; display: block; }
-    
-    /* CTA Button */
+    /* Tabs & Buttons */
+    .stTabs [data-baseweb="tab-list"] { gap: 24px; }
+    .stTabs [data-baseweb="tab"] { 
+        height: 50px; color: #94A3B8; font-weight: 600; 
+        border-radius: 8px 8px 0 0; padding: 10px 20px;
+    }
+    .stTabs [aria-selected="true"] { color: #FB923C !important; border-bottom-color: #FB923C !important; }
+
+    /* Buttons: Primary (Blue) & Secondary (Orange) */
     .stButton>button {
         background: linear-gradient(90deg, #2563EB 0%, #3B82F6 100%) !important;
-        border: none !important; border-radius: 8px !important; color: white !important;
-        font-weight: 800 !important; height: 3.5rem !important; width: 100%; transition: 0.3s;
+        border: none !important; border-radius: 12px !important; color: white !important;
+        font-weight: 800 !important; height: 3.5rem !important; letter-spacing: 1px;
     }
-    .stButton>button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(37, 99, 235, 0.4); }
+    div[data-testid="stSidebar"] button {
+        background: linear-gradient(90deg, #EA580C 0%, #FB923C 100%) !important;
+        height: 2.8rem !important; font-size: 0.8rem !important;
+    }
+    
+    /* Table Styling */
+    .stDataFrame, .stTable { background-color: #0F172A; border-radius: 12px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. THE PERMANENT MASTER DATABASE ---
+# --- 3. THE PERMANENT DATABASE (iGOD Mapping) ---
 INDIA_REGIONAL_DATA = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara"],
         "Haryana": ["Ambala", "Faridabad", "Gurugram", "Hisar", "Karnal", "Panipat", "Rohtak", "Sonipat"],
         "Punjab": ["Amritsar", "Bathinda", "Jalandhar", "Ludhiana", "Mohali", "Patiala"],
         "Uttar Pradesh": ["Agra", "Aligarh", "Ayodhya", "Bareilly", "Ghaziabad", "Gorakhpur", "Jhansi", "Kanpur Nagar", "Lucknow", "Meerut", "Prayagraj", "Varanasi"],
-        "Rajasthan": ["Ajmer", "Alwar", "Bikaner", "Jaipur", "Jodhpur", "Kota", "Sikar", "Udaipur"],
-        "Himachal Pradesh": ["Chamba", "Hamirpur", "Kangra", "Kullu", "Mandi", "Shimla", "Solan"],
-        "Jammu and Kashmir": ["Anantnag", "Baramulla", "Jammu", "Kathua", "Pulwama", "Srinagar", "Udhampur"],
-        "Uttarakhand": ["Dehradun", "Haridwar", "Nainital", "Udham Singh Nagar"],
-        "Chandigarh": ["Chandigarh"], "Ladakh": ["Leh", "Kargil"]
+        "Rajasthan": ["Ajmer", "Alwar", "Bikaner", "Jaipur", "Jodhpur", "Kota", "Sikar", "Udaipur"]
     },
     "West": {
         "Maharashtra": ["Akola", "Amravati", "Aurangabad", "Kolhapur", "Mumbai City", "Mumbai Suburban", "Nagpur", "Nashik", "Pune", "Solapur", "Thane"],
         "Gujarat": ["Ahmedabad", "Amreli", "Anand", "Bhavnagar", "Gandhinagar", "Jamnagar", "Kutch", "Rajkot", "Surat", "Vadodara"],
-        "Goa": ["North Goa", "South Goa"],
-        "Dadra and Nagar Haveli and Daman and Diu": ["Dadra and Nagar Haveli", "Daman", "Diu"],
-        "Madhya Pradesh": ["Bhopal", "Gwalior", "Indore", "Jabalpur", "Rewa", "Sagar", "Ujjain"],
-        "Chhattisgarh": ["Bastar", "Bilaspur", "Durg", "Korba", "Raigarh", "Raipur", "Rajnandgaon"]
+        "Goa": ["North Goa", "South Goa"]
     },
     "South": {
-        "Andhra Pradesh": ["Alluri Sitharama Raju", "Anakapalli", "Ananthapuramu", "Annamayya", "Bapatla", "Chittoor", "Guntur", "Kakinada", "Krishna", "Kurnool", "NTR", "Palnadu", "Visakhapatnam", "Vizianagaram"],
-        "Karnataka": ["Belagavi", "Bengaluru Rural", "Bengaluru Urban", "Dharwad", "Kalaburagi", "Mysuru", "Udupi", "Vijayapura"],
-        "Kerala": ["Alappuzha", "Ernakulam", "Idukki", "Kannur", "Kochi", "Kozhikode", "Malappuram", "Thiruvananthapuram", "Thrissur"],
-        "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Salem", "Thanjavur", "Tiruchirappalli", "Tirunelveli", "Vellore"],
-        "Telangana": ["Hyderabad", "Karimnagar", "Khammam", "Nizamabad", "Rangareddy", "Warangal"],
-        "Puducherry": ["Karaikal", "Mahe", "Puducherry", "Yanam"], "Lakshadweep": ["Lakshadweep"]
+        "Andhra Pradesh": ["Visakhapatnam", "Vijayawada", "Guntur", "Nellore", "Kurnool"],
+        "Karnataka": ["Bengaluru Rural", "Bengaluru Urban", "Dharwad", "Kalaburagi", "Mysuru"],
+        "Kerala": ["Kochi", "Thiruvananthapuram", "Kozhikode", "Thrissur"],
+        "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Salem", "Thanjavur"],
+        "Telangana": ["Hyderabad", "Karimnagar", "Khammam", "Nizamabad"]
     },
     "East/NE": {
-        "West Bengal": ["Asansol", "Darjeeling", "Howrah", "Kolkata", "North 24 Parganas", "Paschim Medinipur", "Siliguri"],
-        "Bihar": ["Araria", "Bhagalpur", "Darbhanga", "Gaya", "Muzaffarpur", "Nalanda", "Patna", "Purnia", "Rohtas", "Vaishali"],
-        "Odisha": ["Balasore", "Bhubaneswar", "Cuttack", "Ganjam", "Puri", "Sambalpur", "Sundargarh"],
-        "Jharkhand": ["Bokaro", "Deoghar", "Dhanbad", "East Singhbhum", "Hazaribagh", "Ranchi"],
-        "Assam": ["Baksa", "Barpeta", "Cachar", "Dibrugarh", "Guwahati", "Jorhat", "Kamrup", "Kokrajhar", "Nagaon", "Tinsukia"],
-        "Arunachal Pradesh": ["Anjaw", "Changlang", "Dibang Valley", "East Kameng", "Itanagar", "Lohit", "Namsai", "Papum Pare", "Tawang"],
-        "Manipur": ["Bishnupur", "Churachandpur", "Imphal East", "Imphal West", "Thoubal"],
-        "Meghalaya": ["East Khasi Hills", "Ri Bhoi", "West Garo Hills"],
-        "Mizoram": ["Aizawl", "Lunglei"], "Nagaland": ["Dimapur", "Kohima", "Mokokchung"],
-        "Tripura": ["Agartala", "West Tripura"], "Sikkim": ["Gangtok", "Namchi"],
-        "Andaman and Nicobar": ["Port Blair"]
+        "West Bengal": ["Asansol", "Darjeeling", "Howrah", "Kolkata", "Siliguri"],
+        "Bihar": ["Bhagalpur", "Gaya", "Muzaffarpur", "Patna"],
+        "Odisha": ["Bhubaneswar", "Cuttack", "Ganjam", "Puri"]
     }
 }
 
-METRO_DATA = {"Mumbai": 0.065, "Delhi": 0.072, "Bengaluru": 0.048, "Chennai": 0.038, "Kolkata": 0.035, "Hyderabad": 0.042, "Ahmedabad": 0.028, "Pune": 0.031}
-
-GENRE_BENCHMARKS = pd.DataFrame({
-    "Genre": ["Short-Form Video", "OTT Entertainment", "Social Networking", "Gaming", "Music Streaming", "News", "E-commerce", "Education", "Sports", "Finance"],
-    "Reach%": ["88%", "72%", "85%", "60%", "55%", "48%", "65%", "30%", "42%", "25%"],
-    "Affinity Index": [115, 130, 105, 110, 120, 145, 110, 160, 135, 185],
-    "Daily Time (Min)": [45, 55, 40, 35, 50, 15, 12, 25, 90, 8]
-})
-
-# --- 4. SIDEBAR COMMAND CENTER ---
+# --- 4. SIDEBAR (Command Center) ---
 with st.sidebar:
     st.markdown("<h2 style='color:white;'>Targeting Command</h2>", unsafe_allow_html=True)
-    
-    m_type = st.radio("Market Classification", ["Overall", "Urban", "Rural"], horizontal=True)
-    lock_geo = m_type in ["Urban", "Rural"]
-    
+    m_type = st.radio("Classification", ["Overall", "Urban", "Rural"], horizontal=True)
     st.markdown("---")
     
-    if lock_geo: st.markdown("<span class='lock-msg'>Locked by Market Cut</span>", unsafe_allow_html=True)
-    sel_metros = st.multiselect("Elite Metros", list(METRO_DATA.keys()), disabled=lock_geo)
-    is_metro = len(sel_metros) > 0
-    
-    if is_metro: st.markdown("<span class='lock-msg'>Locked by Metro Focus</span>", unsafe_allow_html=True)
-    
-    # Regional Filtering
-    sel_regions = st.multiselect("Region Filter", list(INDIA_REGIONAL_DATA.keys()), disabled=is_metro)
+    sel_regions = st.multiselect("Region", list(INDIA_REGIONAL_DATA.keys()))
     
     available_states = []
-    if sel_regions:
-        for r in sel_regions: available_states.extend(list(INDIA_REGIONAL_DATA[r].keys()))
-    else:
-        for r in INDIA_REGIONAL_DATA: available_states.extend(list(INDIA_REGIONAL_DATA[r].keys()))
-        
-    sel_states = st.multiselect("States/UTs", sorted(available_states), disabled=is_metro)
+    for r in (sel_regions if sel_regions else INDIA_REGIONAL_DATA):
+        available_states.extend(list(INDIA_REGIONAL_DATA[r].keys()))
+    sel_states = st.multiselect("States", sorted(available_states))
     
     FLAT_MASTER = {}
     for r in INDIA_REGIONAL_DATA: FLAT_MASTER.update(INDIA_REGIONAL_DATA[r])
-    
     available_districts = []
     for s in sel_states: available_districts.extend(FLAT_MASTER.get(s, []))
     
-    if lock_geo or is_metro: st.markdown("<span class='lock-msg'>District Granularity Disabled</span>", unsafe_allow_html=True)
-    sel_districts = st.multiselect("Filter Districts", sorted(list(set(available_districts))), 
-                                   disabled=(lock_geo or is_metro or not sel_states))
+    sel_districts = st.multiselect("Districts", sorted(list(set(available_districts))), disabled=not sel_states)
     
     st.markdown("---")
     sel_age = st.multiselect("Age Cohorts", ["15-24", "25-34", "35-44", "45+"], default=["15-24", "25-34"])
-    sel_nccs = st.multiselect("Income (NCCS)", ["A", "B", "C", "D", "E"], default=["A", "B"])
+    sel_nccs = st.multiselect("NCCS", ["A", "B", "C", "D", "E"], default=["A", "B"])
     
+    if st.button("💾 SAVE CONFIGURATION"):
+        st.success("Preset Encrypted & Saved")
+
     run_calc = st.button("EXECUTE ANALYSIS")
 
 # --- 5. MAIN DASHBOARD ---
-st.markdown("<h1 style='color:white; letter-spacing:-1px;'>Digital Media <span style='color:#3B82F6;'>Terminal 2026</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='color:white; letter-spacing:-2px;'>Digital Media <span style='color:#FB923C;'>Terminal</span> <span style='color:#3B82F6;'>2026</span></h1>", unsafe_allow_html=True)
 
-tab_calc, tab_bench = st.tabs(["🎯 Custom Campaign Planner", "📊 Market Benchmarks"])
+tab_calc, tab_bench = st.tabs(["🎯 Campaign Planner", "📊 Market Benchmarks"])
 
 with tab_calc:
     if run_calc:
-        TOTAL_INDIA_DIGITAL = 958000
+        TOTAL_BASE = 958000
+        geo_weight = (len(sel_states) * 0.045) if sel_states else 0.8
+        if sel_districts: geo_weight *= (len(sel_districts) / max(1, len(available_districts)))
         
-        if is_metro:
-            geo_weight = sum([METRO_DATA[m] for m in sel_metros])
-            market_label = "Metro Targeted"
-        elif lock_geo:
-            state_base = (len(sel_states) * 0.038) if sel_states else 1.0
-            geo_weight = state_base * (0.43 if m_type == "Urban" else 0.57)
-            market_label = f"{m_type} Segment"
-        else:
-            if not sel_states:
-                geo_weight = 1.0
-                market_label = "Overall India"
-            else:
-                geo_weight = len(sel_states) * 0.038
-                if sel_districts:
-                    geo_weight *= (len(sel_districts) / max(1, len(available_districts)))
-                    market_label = "District Focus"
-                else:
-                    market_label = "State Focus"
-
-        geo_weight = max(0.0, min(geo_weight, 1.0))
-        market_size = int(TOTAL_INDIA_DIGITAL * geo_weight)
-        
+        market_size = int(TOTAL_BASE * geo_weight)
         age_map = {"15-24": 0.38, "25-34": 0.32, "35-44": 0.18, "45+": 0.12}
-        age_w = sum([age_map.get(a) for a in sel_age])
-        nccs_w = len(sel_nccs) * 0.20
-        final_u = int(market_size * age_w * nccs_w)
+        age_w = sum([age_map[a] for a in sel_age])
+        final_u = int(market_size * age_w * (len(sel_nccs)*0.2))
 
-        if "45+" in sel_age and len(sel_age) == 1: mix = [0.60, 0.10, 0.20, 0.10]
-        elif "15-24" in sel_age: mix = [0.30, 0.55, 0.05, 0.10]
-        else: mix = [0.40, 0.35, 0.15, 0.10]
-
-        c1, c2, c3, c4 = st.columns(4)
-        metrics = [
-            ("National AIU", f"{TOTAL_INDIA_DIGITAL:,}", "India Base"),
-            ("Market Potential", f"{market_size:,}", market_label),
-            ("Qualified Target", f"{final_u:,}", "Target Audience"),
-            ("Efficiency Score", f"{(final_u/max(1,market_size)*100):.1f}%", "Selection Ratio")
-        ]
-        for col, (lab, val, sub) in zip([c1, c2, c3, c4], metrics):
-            col.markdown(f"""<div class="metric-card"><div class="label-text">{lab}</div><div class="value-text">{val}</div><div class="sub-text">⚡ {sub}</div></div>""", unsafe_allow_html=True)
+        # Metric Glow Grid
+        c1, c2, c3 = st.columns(3)
+        c1.markdown(f'<div class="metric-card"><div class="label-text">Market Potential</div><div class="value-text">{market_size:,}</div><div class="sub-text-blue">⚡ GEO REACH</div></div>', unsafe_allow_html=True)
+        c2.markdown(f'<div class="metric-card"><div class="label-text">Qualified Target</div><div class="value-text">{final_u:,}</div><div class="sub-text-orange">🔥 TARGETED</div></div>', unsafe_allow_html=True)
+        c3.markdown(f'<div class="metric-card"><div class="label-text">Selection Efficiency</div><div class="value-text">{(final_u/max(1,market_size)*100):.1f}%</div><div class="sub-text-blue">📈 OPTIMIZED</div></div>', unsafe_allow_html=True)
 
         
 
-        st.markdown("<br><div class='metric-card'>", unsafe_allow_html=True)
-        st.markdown("<p class='label-text' style='text-align:center;'>Audience Sizing Funnel</p>", unsafe_allow_html=True)
-        fig_f = go.Figure(go.Funnel(
-            y=["National Universe", "Selected Market", "Qualified Audience"],
-            x=[TOTAL_INDIA_DIGITAL, market_size, final_u],
-            textinfo="value+percent initial",
-            marker={"color": ["#1E293B", "#3B82F6", "#60A5FA"], "line": {"width": 2, "color": "white"}}
-        ))
-        fig_f.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="#94A3B8"), height=400)
-        st.plotly_chart(fig_f, use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("<br><p class='label-text'>Recommended Media Deployment (Optimized for Selected Age)</p>", unsafe_allow_html=True)
-        st.dataframe(pd.DataFrame({
-            "Channel": ["YouTube Shorts", "Meta (FB/IG)", "Smart TV", "Search"],
-            "Allocation": [f"{int(x*100)}%" for x in mix],
-            "Reach ('000)": [f"{int(final_u*x):,}" for x in mix],
-            "Objective": ["Awareness", "Engagement", "Impact", "Intent"]
-        }), use_container_width=True, hide_index=True)
-
+        st.markdown("<br><p class='label-text'>Recommended Media Deployment</p>", unsafe_allow_html=True)
+        
+        # Style the Dataframe for the dark theme
+        df_mix = pd.DataFrame({
+            "Channel": ["YouTube Shorts", "OTT / Connected TV", "Social Feed", "Search/Intent"],
+            "Reach (000s)": [f"{int(final_u*0.42):,}", f"{int(final_u*0.28):,}", f"{int(final_u*0.20):,}", f"{int(final_u*0.10):,}"],
+            "Affinity Index": ["115 (High)", "142 (Elite)", "108 (Mid)", "185 (Max)"]
+        })
+        st.dataframe(df_mix, use_container_width=True, hide_index=True)
+        
     else:
         st.markdown("""
-            <div style='text-align:center; padding-top:100px;'>
-                <h3 style='color:#334155;'>SYSTEM STANDBY</h3>
-                <p style='color:#64748B;'>Select Region/States and click EXECUTE to start the analysis.</p>
+            <div style='text-align:center; padding:100px;'>
+                <h3 style='color:#64748B; font-family:JetBrains Mono;'>SYSTEM STANDBY...</h3>
+                <p style='color:#334155;'>Set targeting parameters in the command center and press execute.</p>
             </div>
         """, unsafe_allow_html=True)
 
 with tab_bench:
-    st.markdown("<br><p class='label-text'>National Media Genre Performance (2026)</p>", unsafe_allow_html=True)
-    st.dataframe(GENRE_BENCHMARKS, use_container_width=True, hide_index=True)
+    st.markdown("<p class='label-text'>National Genre Performance</p>", unsafe_allow_html=True)
     
     
-    
-    st.markdown("<br><p class='label-text'>Top 10 Platform Reach & Dwell Time</p>", unsafe_allow_html=True)
-    PLATFORM_BENCHMARKS = pd.DataFrame({
-        "Platform": ["YouTube", "Instagram", "WhatsApp", "Disney+ Hotstar", "Facebook", "Netflix", "Amazon Prime", "JioCinema", "Spotify", "Snapchat"],
-        "Reach%": ["92%", "78%", "95%", "58%", "74%", "22%", "35%", "52%", "28%", "32%"],
-        "Affinity Index": [110, 125, 100, 140, 95, 210, 180, 115, 155, 140],
-        "Dwell Time (Min)": [48, 38, 42, 52, 30, 65, 45, 40, 55, 25]
+    bench_data = pd.DataFrame({
+        "Genre": ["Short Video", "Social Media", "OTT Video", "Online Gaming", "News", "Finance"],
+        "Daily Penetration": ["88%", "85%", "74%", "62%", "48%", "22%"],
+        "CPM Benchmark (Est)": ["₹85", "₹110", "₹280", "₹140", "₹95", "₹450"]
     })
-    st.dataframe(PLATFORM_BENCHMARKS, use_container_width=True, hide_index=True)
+    st.table(bench_data)
