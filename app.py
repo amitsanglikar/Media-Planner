@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
-import ast
-import re
 import math
 import numpy as np
 from scipy import stats
@@ -45,10 +43,9 @@ st.markdown("""
     
     .glossary-content {
         background: #0f172a; border: 1px solid #00f2ff; padding: 25px; border-radius: 15px;
-        color: #f8fafc; line-height: 1.6;
+        color: #f8fafc; line-height: 1.6; box-shadow: 0 0 30px rgba(0, 242, 255, 0.2);
     }
-    .glossary-term { color: #00f2ff; font-weight: 700; font-family: 'JetBrains Mono'; display: block; margin-top: 12px; }
-    
+    .glossary-term { color: #00f2ff; font-weight: 700; font-family: 'JetBrains Mono'; display: block; margin-top: 10px; }
     .sov-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.75rem; font-weight: 800; margin-top: 10px; display: inline-block; color: white; }
     </style>
     """, unsafe_allow_html=True)
@@ -77,7 +74,7 @@ INDIA_GEO_DATABASE = {
         "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli", "Erode", "Vellore", "Thoothukudi"],
         "Telangana": ["Hyderabad", "Warangal", "Nizamabad", "Karimnagar", "Khammam", "Ramagundam"],
         "Andhra Pradesh": ["Visakhapatnam", "Vijayawada", "Guntur", "Nellore", "Kurnool", "Rajahmundry", "Tirupati", "Kakinada"],
-        "Kerala": ["Kochi", "Thiruvananthapuram", "Kozhikode", "Thrissur", "Malappuram", "Kollam", "Palakkad"]
+        "Kerala": ["Kochi", "Thiruvananthem", "Kozhikode", "Thrissur", "Malappuram", "Kollam", "Palakkad"]
     },
     "East/NE": {
         "West Bengal": ["Kolkata", "Howrah", "Asansol", "Siliguri", "Durgapur", "Bardhaman", "Malda", "Baharampur"],
@@ -99,7 +96,6 @@ METROS = ["Mumbai", "Delhi", "Bengaluru", "Kolkata", "Chennai", "Hyderabad", "Ah
 # --- 4. ENGINE ---
 def calculate_physics(reach_goal_n, n_plus, weeks, m_type):
     l_final = 0
-    # Iterative solver for Poisson distribution
     for l in np.arange(0.1, 150.0, 0.1):
         if (1 - stats.poisson.cdf(n_plus - 1, l)) * 100 >= reach_goal_n:
             l_final = l
@@ -119,7 +115,7 @@ def calculate_physics(reach_goal_n, n_plus, weeks, m_type):
     
     return round(l_final, 1), round(reach_1p, 1), round(sov, 1), tier, color, impact, round(dynamic_ecpm, 2)
 
-# --- 5. TOP BAR & MODAL ---
+# --- 5. TOP BAR & MODAL LOGIC ---
 st.markdown('<p style="font-size:2.8rem; font-weight:900; color:white; margin-bottom:0;">VIRTUAL DIGITAL <span style="color:#00f2ff;">MEDIA TERMINAL</span></p>', unsafe_allow_html=True)
 
 @st.dialog("GLOSSARY & INTELLIGENCE LOGIC")
@@ -127,19 +123,19 @@ def open_glossary():
     st.markdown("""
     <div class="glossary-content">
         <span class="glossary-term">Digital Universe (TAM)</span>
-        The estimated total digital population. <b>Source:</b> IAMAI 2026 Internet in India Projection (950M Base).
+        Total addressable digital population. Source: IAMAI 2026 Internet in India Projections (950M Base).
         
         <span class="glossary-term">Actual Frequency</span>
-        The raw average exposure (Lambda) needed to break market noise. Solved via the Poisson distribution to satisfy the user's N+ tail goal.
+        The average number of times an individual is exposed to the creative. Calculated as the raw Lambda ($\lambda$) required to satisfy the Poisson tail for the N+ goal.
         
         <span class="glossary-term">Reach @ 1+ (Derived)</span>
-        Percentage of the audience touched at least once. <b>Formula:</b> $(1 - e^{-\lambda}) \\times 100$.
+        The percentage of the universe seeing the ad at least once. Formula: $(1 - e^{-\lambda}) \\times 100$.
         
         <span class="glossary-term">Market SOV (Share of Voice)</span>
-        Percentage of total weekly inventory capacity consumed by the campaign.
+        Inventory occupancy relative to total market capacity (Urban: 60 units/wk, Rural: 35 units/wk).
         
         <span class="glossary-term">Dynamic eCPM</span>
-        Inventory pricing that adjusts based on demand. High SOV targets inflate the base CPM to reflect auction saturation.
+        SOV-weighted cost per 1,000 impressions. Higher SOV targets trigger a "scarcity penalty" increasing the base rate.
     </div>
     """, unsafe_allow_html=True)
 
@@ -152,11 +148,18 @@ with st.sidebar:
     m_type = st.radio("Market Type", ["Urban", "Rural"], horizontal=True)
     
     st.markdown("---")
+    # DEMOGRAPHICS
+    sel_age = st.multiselect("Age Cohorts", ["15-24", "25-34", "35-44", "45+"], default=["15-24", "25-34"])
+    sel_gender = st.radio("Gender", ["Both", "Male", "Female"], horizontal=True)
+    sel_nccs = st.multiselect("NCCS Group", ["A", "B", "C", "D", "E"], default=["A", "B"])
+
+    st.markdown("---")
+    # GEOGRAPHY
     zone_options = ["8 Metros"] + list(INDIA_GEO_DATABASE.keys())
-    sel_zones = st.multiselect("Select Zones", zone_options)
+    sel_zones = st.multiselect("Select Zones", zone_options, default=["8 Metros"])
     
     if "8 Metros" in sel_zones:
-        sel_states = st.multiselect("Top 8 Metros", sorted(METROS))
+        sel_states = st.multiselect("Top 8 Metros", sorted(METROS), default=["Mumbai", "Delhi", "Bengaluru"])
         sel_districts = sel_states
     else:
         avail_states = []
@@ -171,25 +174,35 @@ with st.sidebar:
         sel_districts = st.multiselect("Select Districts", sorted(avail_districts))
     
     st.markdown("---")
-    r_goal = st.slider("Reach Target % @ N+", 5, 95, 45)
+    # GOALS
+    r_goal = st.slider("Reach Target % @ N+", 5, 95, 50)
     n_eff = st.number_input("Freq Threshold (N+)", 1, 15, 4)
-    weeks = st.slider("Duration (Weeks)", 1, 12, 4)
+    weeks = st.slider("Duration (Weeks)", 1, 12, 3)
     execute = st.button("EXECUTE PLAN", use_container_width=True)
 
 # --- 7. MAIN DASHBOARD ---
 if execute:
     freq, r1_perc, sov_val, tier, t_color, t_impact, dynamic_ecpm = calculate_physics(r_goal, n_eff, weeks, m_type)
     
+    # TAM CALCULATOR WITH DEMO MULTIPLIERS
     universe_base = 950000000 
-    geo_count = len(sel_districts) if sel_districts else (len(sel_states)*5 if sel_states else 1)
-    universe = int(universe_base * (geo_count / 1000) * 8) 
+    geo_count = len(sel_districts) if sel_districts else 1
+    
+    # Weighting factors
+    age_multiplier = len(sel_age) / 4
+    gender_multiplier = 1.0 if sel_gender == "Both" else 0.52 # Slight skew for digital male/female ratios
+    nccs_map = {"A": 0.35, "B": 0.30, "C": 0.20, "D": 0.10, "E": 0.05}
+    nccs_multiplier = sum([nccs_map[x] for x in sel_nccs]) if sel_nccs else 1.0
+
+    universe = int(universe_base * (geo_count / 750) * age_multiplier * gender_multiplier * nccs_multiplier * 10) 
+    
     r1_abs = int(universe * (r1_perc / 100))
     total_imps = int(r1_abs * freq)
     est_budget = (total_imps / 1000) * dynamic_ecpm
 
     st.markdown('<div class="section-header">CORE REACH METRICS</div>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.markdown(f'<div class="metric-card"><div class="label">Digital Universe</div><div class="value">{universe:,}</div><div class="sub-value">Target TAM</div></div>', unsafe_allow_html=True)
+    with c1: st.markdown(f'<div class="metric-card"><div class="label">Target TAM</div><div class="value">{universe:,}</div><div class="sub-value">Audience Universe</div></div>', unsafe_allow_html=True)
     with c2: st.markdown(f'<div class="metric-card"><div class="label">Reach @ 1+</div><div class="value">{r1_perc}%</div><div class="sub-value">{r1_abs:,} People</div></div>', unsafe_allow_html=True)
     with c3: st.markdown(f'<div class="metric-card"><div class="label">Actual Frequency</div><div class="value">{freq}</div><div class="sub-value">{total_imps:,} Total Imps</div></div>', unsafe_allow_html=True)
     with c4: st.markdown(f'<div class="metric-card-impact"><div class="label">SOV & Impact</div><div class="value" style="color:{t_color};">{sov_val}%</div><div class="sov-badge" style="background:{t_color}">{tier}</div><div class="sub-value" style="color:#EEE;">{t_impact}</div></div>', unsafe_allow_html=True)
@@ -201,8 +214,5 @@ if execute:
     with f3: st.markdown(f'<div class="metric-card"><div class="label">Cost / Unique</div><div class="value">₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}</div></div>', unsafe_allow_html=True)
     with f4: st.markdown(f'<div class="metric-card-impact"><div class="label">Efficiency</div><div class="value">{"HIGH" if sov_val < 25 else "LOW"}</div></div>', unsafe_allow_html=True)
 
-    
-    
-
 else:
-    st.info("System Ready. Adjust inputs in the sidebar and execute to view the tailored media plan.")
+    st.info("System Ready. Select Demographics and Geography to begin.")
