@@ -71,7 +71,7 @@ INDIA_GEO_DATABASE = {
     }
 }
 
-# --- 4. SIDEBAR ---
+# --- 4. SIDEBAR (LOCKED WITH CONTINUITY) ---
 with st.sidebar:
     st.markdown("<h2 style='color:white;'>Media Command</h2>", unsafe_allow_html=True)
     m_type = st.radio("Market Type", ["Overall", "Urban", "Rural"], horizontal=True)
@@ -89,14 +89,14 @@ with st.sidebar:
     sel_nccs = st.multiselect("4. NCCS", ["A", "B", "C", "D", "E"], default=["A", "B"])
     
     st.markdown("---")
-    st.markdown("### Continuity & Frequency")
+    st.markdown("### Continuity & Weight")
     exp_reach = st.slider("Reach Goal (%)", 5, 100, 45)
     eff_freq_n = st.number_input("Effective Freq (N+)", 1, 10, 4)
     weeks_on_air = st.slider("Weeks on Air", 1, 52, 4)
     
     run_calc = st.button("EXECUTE ANALYSIS")
 
-# --- 5. MAIN OUTPUT ---
+# --- 5. OUTPUT ENGINE ---
 st.markdown("<h1 style='color:white;'>Digital Media <span style='color:#3B82F6;'>Terminal 2026</span></h1>", unsafe_allow_html=True)
 
 if run_calc:
@@ -105,62 +105,50 @@ if run_calc:
     state_ratio = (len(sel_states) / 36) if sel_states else 1.0
     pen_map = {"Urban": 0.75, "Rural": 0.52, "Overall": 0.64}
     
+    # Qualified Target Calculation
     qual_u = int(INDIA_BASE * state_ratio * pen_map[m_type] * (len(sel_age)*0.25) * (len(sel_nccs)*0.2))
     
-    # GLOBAL CAMPAIGN FREQUENCY LOGIC
-    avg_f_total = round(eff_freq_n * (1 + (exp_reach / 180)), 1)
-    campaign_freq_cap = round(avg_f_total * 2.2, 0)
+    # FREQUENCY CAP CALCULATION
+    # Formula: Avg Freq Required to hit N+ Reach
+    # Avg Freq = Effective N+ * (Reach Scaling Factor)
+    avg_f_req = eff_freq_n * (1 + (exp_reach / 200))
+    
+    # Frequency Cap (Weekly Ceiling to prevent wastage)
+    # As weeks increase, the cap per week lowers to distribute reach.
+    freq_cap_weekly = round((avg_f_req * 1.4) / weeks_on_air, 1)
     
     planned_reach_abs = int(qual_u * (exp_reach / 100))
-    total_imps_000 = int(planned_reach_abs * avg_f_total)
+    total_imps_000 = int(planned_reach_abs * avg_f_req)
 
-    # --- TOP KPI BOXES ---
+    # --- KPI BOXES ---
     c1, c2, c3, c4 = st.columns(4)
-    with c1:
-        st.markdown(f'<div class="metric-card"><div class="label-text">Qualified Target</div><div class="value-text">{qual_u:,}</div><div class="sub-text">Universe (\'000)</div></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown(f'<div class="metric-card"><div class="label-text">Planned Reach</div><div class="value-text">{planned_reach_abs:,}</div><div class="sub-text">{exp_reach}% Reach Goal</div></div>', unsafe_allow_html=True)
-    with c3:
-        # Removed 'x'
-        st.markdown(f'<div class="metric-card"><div class="label-text">Avg. Frequency</div><div class="value-text" style="color:#60A5FA;">{avg_f_total}</div><div class="sub-text">Total for {weeks_on_air} Weeks</div></div>', unsafe_allow_html=True)
-    with c4:
-        # Removed 'x'
-        st.markdown(f'<div class="metric-card"><div class="label-text">Campaign Freq Cap</div><div class="value-text" style="color:#10B981;">{int(campaign_freq_cap)}</div><div class="sub-text">Overall Strategy Limit</div></div>', unsafe_allow_html=True)
+    c1.markdown(f'<div class="metric-card"><div class="label-text">Qualified Target</div><div class="value-text">{qual_u:,}</div><div class="sub-text">Universe (\'000)</div></div>', unsafe_allow_html=True)
+    c2.markdown(f'<div class="metric-card"><div class="label-text">Planned Reach</div><div class="value-text">{planned_reach_abs:,}</div><div class="sub-text">{exp_reach}% of Target</div></div>', unsafe_allow_html=True)
+    c3.markdown(f'<div class="metric-card"><div class="label-text">Avg. Frequency</div><div class="value-text" style="color:#60A5FA;">{round(avg_f_req, 1)}x</div><div class="sub-text">Total for {weeks_on_air} Weeks</div></div>', unsafe_allow_html=True)
+    c4.markdown(f'<div class="metric-card"><div class="label-text">Frequency Cap</div><div class="value-text" style="color:#10B981;">{freq_cap_weekly}x</div><div class="sub-text">Recommended Weekly Cap</div></div>', unsafe_allow_html=True)
 
-    # --- STRATEGIC QUALIFICATION TABLE ---
+    # --- STRATEGIC OUTPUT TABLE ---
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-    st.markdown("<p class='label-text'>Campaign Qualification & Volume Matrix</p>", unsafe_allow_html=True)
+    st.markdown("<p class='label-text'>Strategic Campaign Framework</p>", unsafe_allow_html=True)
     
-    matrix_data = {
-        "Strategic Parameter": [
-            "Effective Frequency Target", 
-            "Campaign Duration", 
-            "Overall Avg. Frequency", 
-            "Global Frequency Cap", 
-            "Gross Impressions ('000)"
-        ],
-        "System Value": [
-            f"{eff_freq_n}+ Exposures", 
-            f"{weeks_on_air} Weeks", 
-            f"{avg_f_total}", 
-            f"{int(campaign_freq_cap)}", 
-            f"{total_imps_000:,}"
-        ],
-        "Rationale": [
-            "Impact Threshold", 
-            "Continuity Period", 
-            "Weighted Mean Delivery", 
-            "Saturation Protection", 
-            "Inventory Pipeline"
+    
+    
+    strat_table = pd.DataFrame({
+        "Strategic Metric": ["Targeting Depth (N+)", "Campaign Duration", "Weekly Frequency Cap", "Gross Impressions ('000)"],
+        "Calculation": [f"{eff_freq_n}+ Exposures", f"{weeks_on_air} Weeks", f"{freq_cap_weekly}x / Week", f"{total_imps_000:,}"],
+        "Planning Rationale": [
+            "Minimum impact per user", 
+            "Continuity / Market Presence", 
+            "Optimized Reach / Wastage Control",
+            "Total Inventory Pipeline"
         ]
-    }
-    st.table(pd.DataFrame(matrix_data))
-    st.markdown("</div>", unsafe_allow_html=True)
+    })
+    st.table(strat_table)
 
     
 
-    st.info(f"💡 Strategy: To hit {exp_reach}% reach at a {eff_freq_n}+ threshold over {weeks_on_air} weeks, the terminal has provisioned {total_imps_000:,}k impressions.")
+    # --- CONTINUITY INSIGHT ---
+    st.info(f"💡 Strategy: To achieve {exp_reach}% reach at {eff_freq_n}+ depth over {weeks_on_air} weeks, maintain a weekly frequency cap of {freq_cap_weekly}x. This ensures your budget spreads across the full {weeks_on_air} weeks rather than over-saturating in the first few days.")
 
 else:
     st.markdown("<div style='text-align:center; padding-top:100px; color:#64748B;'>Terminal Standby. Configure Sidebar and Execute.</div>", unsafe_allow_html=True)
