@@ -31,11 +31,10 @@ st.markdown("""
         border: 1px solid #00f2ff33;
         box-shadow: 0 0 15px rgba(0, 242, 255, 0.1);
         padding: 1.5rem; border-radius: 12px; border-left: 5px solid #00f2ff;
-        min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;
+        min-height: 175px; display: flex; flex-direction: column; justify-content: space-between;
     }
     .metric-card-impact { border-color: #bc13fe33; border-left: 5px solid #bc13fe; }
     
-    /* Layman Tooltip Logic */
     .tooltip { position: relative; display: inline-block; cursor: help; margin-left: 5px; color: #00f2ff; font-size: 0.8rem; }
     .tooltip .tooltiptext {
         visibility: hidden; width: 240px; background-color: #111; color: #fff;
@@ -48,6 +47,7 @@ st.markdown("""
     .label { color: #00f2ff; font-family: 'JetBrains Mono'; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; display: flex; align-items: center; }
     .value { color: #ffffff; font-size: 2.1rem; font-weight: 900; margin-top: 5px; }
     .sub-value { font-size: 0.8rem; color: #888; margin-top: 8px; font-weight: 500; }
+    
     .section-header {
         background: linear-gradient(90deg, #00f2ff11 0%, transparent 100%);
         padding: 12px 20px; border-radius: 4px; border-left: 3px solid #00f2ff;
@@ -56,7 +56,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE (FIXED) ---
+# --- 3. DATABASE (LOCKED) ---
 INDIA_GEO_DATABASE = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara", "North West Delhi", "South East Delhi"],
@@ -108,9 +108,9 @@ def calculate_physics(reach_goal_n, n_plus, weeks, m_type):
             break
     reach_1p = (1 - math.exp(-l_final)) * 100
     sov = (l_final / ((55 if m_type == "Urban" else 30) * weeks)) * 100
-    if sov < 10: tier, color, desc = "MAINTENANCE", "#64748B", "Whisper Mode"
-    elif sov < 20: tier, color, desc = "CHALLENGER", "#00f2ff", "Loud & Clear"
-    else: tier, color, desc = "DOMINANT", "#bc13fe", "Market Boss"
+    if sov < 10: tier, color, desc = "MAINTENANCE", "#64748B", "Maintenance"
+    elif sov < 20: tier, color, desc = "CHALLENGER", "#00f2ff", "Challenger"
+    else: tier, color, desc = "DOMINANT", "#bc13fe", "Dominant"
     return round(l_final, 1), round(reach_1p, 1), round(sov, 1), tier, color, desc
 
 # --- 5. SIDEBAR ---
@@ -127,6 +127,7 @@ with st.sidebar:
     for z in (sel_zones if sel_zones else INDIA_GEO_DATABASE.keys()): avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
     sel_states = st.multiselect("Select States", sorted(avail_states))
     
+    # DISTRICT DROPDOWN RESTORED
     avail_districts = []
     if sel_states:
         for z in INDIA_GEO_DATABASE:
@@ -142,7 +143,6 @@ with st.sidebar:
 
 # --- 6. DASHBOARD ---
 st.markdown('<p style="font-size:2.8rem; font-weight:900; color:white; margin-bottom:0; letter-spacing:-1px;">VIRTUAL DIGITAL <span style="color:#00f2ff;">MEDIA PLANNING TOOL</span></p>', unsafe_allow_html=True)
-st.markdown('<p style="color:#00f2ff; font-family:\'JetBrains Mono\'; font-size:0.8rem; margin-bottom:30px; letter-spacing:4px;">POWERED BY 2026 IAMAI/TRAI DATASETS</p>', unsafe_allow_html=True)
 
 def get_label(text, info):
     return f'<div class="label">{text}<div class="tooltip">ⓘ<span class="tooltiptext">{info}</span></div></div>'
@@ -161,18 +161,18 @@ if execute:
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.markdown(f'<div class="metric-card">{get_label("Digital Universe", "The total number of people on the internet in your selected area. Think of it as the total size of the playground.")}<div class="value">{universe:,}</div><div class="sub-value">IAMAI/TRAI 2026 Est.</div></div>', unsafe_allow_html=True)
     with c2: st.markdown(f'<div class="metric-card">{get_label("People Reached", "How many unique people will see your ad at least once. Like counting heads in a crowd.")}<div class="value">{r1_perc}%</div><div class="sub-value">{r1_abs:,} People</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="metric-card">{get_label("Ad Repetition", "The average number of times one person will see your ad. Seeing it once is a glance, 4 times is a memory.")}<div class="value">{freq}x</div><div class="sub-value">{total_imps:,} Views</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="metric-card-impact">{get_label("Market Shout", "How much of the total conversation you own. High % means people remember you over everyone else.")}<div class="value" style="color:{t_color};">{sov_val}%</div><div class="sov-badge">{tier}</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="metric-card">{get_label("Actual Frequency", "The average number of times one person will see your ad. Seeing it once is a glance, but seeing it 4 times makes them remember you.")}<div class="value">{freq}x</div><div class="sub-value">{total_imps:,} Total Views</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="metric-card-impact">{get_label("Market Shout", "How much of the total conversation you own. A high number means people remember your brand over everyone else.")}<div class="value" style="color:{t_color};">{sov_val}%</div><div class="sov-badge">{tier}</div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-header">MONEY & EFFICIENCY</div>', unsafe_allow_html=True)
     b1, b2, b3, b4 = st.columns(4)
-    with b1: st.markdown(f'<div class="metric-card">{get_label("Total Cost", "The total pocket money needed to run this whole plan for the selected weeks.")}<div class="value">₹{int(est_budget):,}</div><div class="sub-value">Investment</div></div>', unsafe_allow_html=True)
-    with b2: st.markdown(f'<div class="metric-card">{get_label("Cost Per Person", "The actual cost to reach one single person in your target group. Usually just a few paise!")}<div class="value">₹{round(est_budget/r1_abs, 2)}</div><div class="sub-value">Per Unique Head</div></div>', unsafe_allow_html=True)
-    with b3: st.markdown(f'<div class="metric-card">{get_label("eCPM", "The price for every 1,000 times your ad is shown. It is like the wholesale price of views.")}<div class="value">₹{round(ecpm, 2)}</div><div class="sub-value">Wholesale Rate</div></div>', unsafe_allow_html=True)
-    with b4: st.markdown(f'<div class="metric-card">{get_label("Success Chance", "How likely you are to stand out. High saturation means you have successfully crowded out the noise.")}<div class="value">{"HIGH" if sov_val > 18 else "MED"}</div><div class="sub-value">Impact Grade</div></div>', unsafe_allow_html=True)
+    with b1: st.markdown(f'<div class="metric-card">{get_label("Total Cost", "The total amount of money needed to run this whole plan for the selected weeks.")}<div class="value">₹{int(est_budget):,}</div><div class="sub-value">Investment</div></div>', unsafe_allow_html=True)
+    with b2: st.markdown(f'<div class="metric-card">{get_label("Cost Per Person", "The actual cost to reach one single person in your group. Usually, it is just a few paise!")}<div class="value">₹{round(est_budget/r1_abs, 2)}</div><div class="sub-value">Per Unique Head</div></div>', unsafe_allow_html=True)
+    with b3: st.markdown(f'<div class="metric-card">{get_label("eCPM", "The price for every 1,000 times your ad is shown. Think of it as the wholesale price of views.")}<div class="value">₹{round(ecpm, 2)}</div><div class="sub-value">Wholesale Rate</div></div>', unsafe_allow_html=True)
+    with b4: st.markdown(f'<div class="metric-card">{get_label("Success Chance", "How likely you are to be the most famous brand in the market. High means you have successfully crowded out the noise.")}<div class="value">{"HIGH" if sov_val > 18 else "MED"}</div><div class="sub-value">Impact Grade</div></div>', unsafe_allow_html=True)
 
     
-    
+
     st.markdown('<div class="section-header">WHERE THEY SPEND TIME (AI PREDICTION)</div>', unsafe_allow_html=True)
     try:
         ai_prompt = f"Media Strategist 2026. Audience: {sel_age}, {sel_gender}, NCCS {sel_nccs}. Market: {m_type}. Return Python dict 'genres' and 'platforms' (Top 10)."
