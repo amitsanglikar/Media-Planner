@@ -92,13 +92,24 @@ with st.sidebar:
     m_type = st.radio("Market Type", ["Overall", "Urban", "Rural"], horizontal=True)
     st.markdown("---")
     
-    # 1. ZONE SELECTION
-    sel_zones = st.multiselect("1. Select Zones", list(INDIA_GEO_DATABASE.keys()))
-    zone_active = len(sel_zones) > 0
+    # 1. ZONE SELECTION 
+    # Logic: Lock Zone if State is already selected
+    state_filled = len(st.session_state.get('state_selector', [])) > 0
+    if state_filled:
+        st.markdown("<p class='lock-msg'>🔒 Locked (State Focus Active)</p>", unsafe_allow_html=True)
+    
+    sel_zones = st.multiselect(
+        "1. Select Zones", 
+        list(INDIA_GEO_DATABASE.keys()), 
+        disabled=state_filled,
+        key="zone_selector"
+    )
+    zone_filled = len(sel_zones) > 0
 
-    # 2. STATE SELECTION (Locked if Zone is active)
-    if zone_active:
-        st.markdown("<p class='lock-msg'>🔒 Locked (Zone Active)</p>", unsafe_allow_html=True)
+    # 2. STATE SELECTION
+    # Logic: Lock State if Zone is selected
+    if zone_filled:
+        st.markdown("<p class='lock-msg'>🔒 Locked (Zone Focus Active)</p>", unsafe_allow_html=True)
     
     avail_states = []
     for z in INDIA_GEO_DATABASE: avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
@@ -106,14 +117,15 @@ with st.sidebar:
     sel_states = st.multiselect(
         "2. Select States", 
         sorted(avail_states), 
-        disabled=zone_active,
+        disabled=zone_filled,
         key="state_selector"
     )
 
-    # 3. DISTRICT SELECTION (Locked if Zone or no State is active)
-    dist_locked = zone_active or not sel_states
+    # 3. DISTRICT SELECTION
+    # Logic: Locked if Zone is active OR if no states are selected
+    dist_locked = zone_filled or not sel_states
     if dist_locked:
-        msg = "🔒 Locked (Zone Active)" if zone_active else "Select State first"
+        msg = "🔒 Locked (Zone Active)" if zone_filled else "Select State first"
         st.markdown(f"<p class='lock-msg'>{msg}</p>", unsafe_allow_html=True)
 
     avail_districts = []
@@ -146,12 +158,9 @@ if run_calc:
     # --- CALCULATION ENGINE ---
     INDIA_BASE = 958000 
     
-    # Logic for Zone vs State weighting
-    if zone_active:
-        # Zone selection averages about 25% of national base per zone
-        geo_weight = len(sel_zones) * 0.25
+    if zone_filled:
+        geo_weight = len(sel_zones) * 0.22 # Balanced zone weight
     else:
-        # State & District logic
         state_weight = (len(sel_states) * 0.045) if sel_states else 1.0
         dist_weight = (len(sel_districts) / max(1, len(avail_districts))) if sel_districts else 1.0
         geo_weight = state_weight * dist_weight
