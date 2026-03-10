@@ -5,7 +5,7 @@ import numpy as np
 # --- 1. SYSTEM CONFIGURATION ---
 st.set_page_config(page_title="Media Intelligence Terminal", layout="wide", page_icon="🏛️")
 
-# --- 2. ELITE-UI CSS (Blue & Orange Theme) ---
+# --- 2. ELITE-UI CSS ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap');
@@ -33,6 +33,8 @@ st.markdown("""
     .sub-text { color: #3B82F6; font-size: 0.75rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
     .sub-text-orange { color: #FB923C; font-size: 0.75rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
     
+    .lock-msg { color: #EF4444; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; margin-bottom: -15px; }
+
     .stButton>button {
         background: linear-gradient(90deg, #EA580C 0%, #FB923C 100%) !important;
         border: none !important; border-radius: 8px !important; color: white !important;
@@ -90,20 +92,41 @@ with st.sidebar:
     m_type = st.radio("Market Type", ["Overall", "Urban", "Rural"], horizontal=True)
     st.markdown("---")
     
+    # 1. ZONE SELECTION
     sel_zones = st.multiselect("1. Select Zones", list(INDIA_GEO_DATABASE.keys()))
+    zone_active = len(sel_zones) > 0
+
+    # 2. STATE SELECTION (Locked if Zone is active)
+    if zone_active:
+        st.markdown("<p class='lock-msg'>🔒 Locked (Zone Active)</p>", unsafe_allow_html=True)
     
     avail_states = []
-    if sel_zones:
-        for z in sel_zones: avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
-    else:
-        for z in INDIA_GEO_DATABASE: avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
-    sel_states = st.multiselect("2. Select States", sorted(avail_states))
+    for z in INDIA_GEO_DATABASE: avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
+    
+    sel_states = st.multiselect(
+        "2. Select States", 
+        sorted(avail_states), 
+        disabled=zone_active,
+        key="state_selector"
+    )
+
+    # 3. DISTRICT SELECTION (Locked if Zone or no State is active)
+    dist_locked = zone_active or not sel_states
+    if dist_locked:
+        msg = "🔒 Locked (Zone Active)" if zone_active else "Select State first"
+        st.markdown(f"<p class='lock-msg'>{msg}</p>", unsafe_allow_html=True)
 
     avail_districts = []
     FLAT_MAP = {}
     for z in INDIA_GEO_DATABASE: FLAT_MAP.update(INDIA_GEO_DATABASE[z])
     for s in sel_states: avail_districts.extend(FLAT_MAP.get(s, []))
-    sel_districts = st.multiselect("3. Select Districts", sorted(list(set(avail_districts))), disabled=not sel_states)
+    
+    sel_districts = st.multiselect(
+        "3. Select Districts", 
+        sorted(list(set(avail_districts))), 
+        disabled=dist_locked,
+        key="dist_selector"
+    )
 
     st.markdown("---")
     sel_age = st.multiselect("4. Age Cohorts", ["15-24", "25-34", "35-44", "45+"], default=["15-24", "25-34"])
@@ -122,11 +145,19 @@ st.markdown("<h1 style='color:white;'>Digital Media <span style='color:#3B82F6;'
 if run_calc:
     # --- CALCULATION ENGINE ---
     INDIA_BASE = 958000 
-    state_weight = (len(sel_states) * 0.045) if sel_states else 1.0
-    dist_weight = (len(sel_districts) / max(1, len(avail_districts))) if sel_districts else 1.0
+    
+    # Logic for Zone vs State weighting
+    if zone_active:
+        # Zone selection averages about 25% of national base per zone
+        geo_weight = len(sel_zones) * 0.25
+    else:
+        # State & District logic
+        state_weight = (len(sel_states) * 0.045) if sel_states else 1.0
+        dist_weight = (len(sel_districts) / max(1, len(avail_districts))) if sel_districts else 1.0
+        geo_weight = state_weight * dist_weight
     
     pen_map = {"Urban": 0.75, "Rural": 0.52, "Overall": 0.64}
-    qual_u = int(INDIA_BASE * state_weight * dist_weight * pen_map[m_type] * (len(sel_age)*0.25) * (len(sel_nccs)*0.2))
+    qual_u = int(INDIA_BASE * geo_weight * pen_map[m_type] * (len(sel_age)*0.25) * (len(sel_nccs)*0.2))
     
     avg_f_total = round(eff_freq_n * (1 + (exp_reach / 150)), 1)
     planned_reach_abs = int(qual_u * (exp_reach / 100))
@@ -144,7 +175,6 @@ if run_calc:
     with c4:
         st.markdown(f'<div class="metric-card"><div class="label-text">Gross Impressions</div><div class="value-text" style="color:#10B981;">{total_imps_val:,}</div><div class="sub-text">Total Volume (\'000)</div></div>', unsafe_allow_html=True)
 
-    # SPACE RESERVED FOR YOUR NEXT MODULES BELOW
     st.markdown("<br><br>", unsafe_allow_html=True)
 
 else:
