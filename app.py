@@ -35,9 +35,9 @@ st.markdown("""
     
     .tooltip { position: relative; display: inline-block; cursor: help; margin-left: 5px; color: #00f2ff; font-size: 0.8rem; }
     .tooltip .tooltiptext {
-        visibility: hidden; width: 260px; background-color: #111; color: #fff;
+        visibility: hidden; width: 280px; background-color: #111; color: #fff;
         border-radius: 6px; padding: 12px; position: absolute; z-index: 100;
-        bottom: 125%; left: 50%; margin-left: -130px; opacity: 0; transition: opacity 0.3s;
+        bottom: 125%; left: 50%; margin-left: -140px; opacity: 0; transition: opacity 0.3s;
         border: 1px solid #00f2ff; font-family: 'Inter', sans-serif; font-size: 0.8rem; text-transform: none; letter-spacing: 0;
     }
     .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; box-shadow: 0 0 15px #00f2ff55; }
@@ -55,7 +55,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE (FULL LIST) ---
+# --- 3. DATABASE (LOCKED) ---
 INDIA_GEO_DATABASE = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara", "North West Delhi", "South East Delhi"],
@@ -71,7 +71,7 @@ INDIA_GEO_DATABASE = {
         "Maharashtra": ["Mumbai City", "Mumbai Suburban", "Pune", "Nagpur", "Thane", "Nashik", "Aurangabad", "Solapur", "Amravati", "Navi Mumbai", "Kolhapur"],
         "Gujarat": ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Jamnagar", "Gandhinagar", "Junagadh", "Anand"],
         "Madhya Pradesh": ["Indore", "Bhopal", "Jabalpur", "Gwalior", "Ujjain", "Sagar", "Rewa", "Ratlam"],
-        "Chhattisgarh": ["Raipur", "Bhilai", "Bilaspur", "Korba", "Durg"],
+        "Chhattisgarh": ["Raipur", "Bhilai", "Bilapur", "Korba", "Durg"],
         "Goa": ["North Goa", "South Goa"]
     },
     "South": {
@@ -97,7 +97,7 @@ INDIA_GEO_DATABASE = {
     }
 }
 
-# --- 4. ENGINE (FIXED MARKET LOGIC) ---
+# --- 4. ENGINE (MARKET CAPACITY & BREAKTHROUGH PHYSICS) ---
 def calculate_breakthrough_physics(reach_goal_n, n_plus, weeks, market_choice):
     if market_choice == "Urban":
         capacity, base_ecpm = 60, 175
@@ -112,7 +112,7 @@ def calculate_breakthrough_physics(reach_goal_n, n_plus, weeks, market_choice):
             l_raw = l
             break
     
-    l_impact = l_raw * 1.3 # 30% Wastage factor
+    l_impact = l_raw * 1.3 # Wastage factor
     
     if l_impact < 6: f_tier, f_color = "Forgettable", "#64748B"
     elif 6 <= l_impact < 10: f_tier, f_color = "Challenger", "#94a3b8"
@@ -131,7 +131,15 @@ with st.sidebar:
     m_type = st.radio("Market Selection", ["Urban", "Rural", "Both"], horizontal=True, index=2)
     sel_age = st.multiselect("Target Age", ["15-24", "25-34", "35-44", "45+"], default=["15-24", "25-34"])
     sel_gender = st.radio("Gender Selection", ["Both", "Male", "Female"], horizontal=True)
-    sel_nccs = st.multiselect("NCCS Group", ["A", "B", "C", "D", "E"], default=["A", "B"])
+    
+    NCCS_DATA = {
+        "A": "Highly educated, Premium assets (AC/Car). High Income.",
+        "B": "Graduates, Basic comforts (Fridge/Bike). Stable Savings.",
+        "C": "Value-conscious, Middle school/Graduates.",
+        "D": "Primary education, Price sensitive mass.",
+        "E": "Lower socio-economic segment."
+    }
+    sel_nccs = st.multiselect("NCCS Group", list(NCCS_DATA.keys()), default=["A", "B"])
     
     st.markdown("---")
     sel_zones = st.multiselect("Select Zones", list(INDIA_GEO_DATABASE.keys()))
@@ -165,7 +173,7 @@ def get_label(text, info):
 if execute:
     freq, f_tier, f_color, r1_perc, sov_val, d_ecpm = calculate_breakthrough_physics(r_goal, n_eff, weeks, m_type)
     
-    # Universe Logic: Scale 950M base (IAMAI/TRAI 2026)
+    # Universe Logic: Scale 950M base (IAMAI/TRAI 2026 trajectory)
     age_weight = len(sel_age) / 4
     nccs_weight = len(sel_nccs) / 5
     gender_weight = 0.5 if sel_gender != "Both" else 1.0
@@ -181,24 +189,25 @@ if execute:
     c1_2, c3, c4 = st.columns([2, 1, 1])
     
     with c1_2: 
+        nccs_hover = " | ".join([f"{g}: {NCCS_DATA[g]}" for g in sel_nccs])
         st.markdown(f'''
             <div class="metric-card">
-                {get_label("Potential Audience", "Selected Age, NCCS, Gender aur Market ke basis par 950M internet users ko filter karke aapka target pool dikhata hai.")}
+                {get_label("Potential Audience", f"Selected Persona: {nccs_hover}. Filters applied to 950M Internet Base.")}
                 <div style="display: flex; justify-content: space-between; align-items: flex-end;">
                     <div>
                         <div class="value">{universe:,}</div>
-                        <div class="sub-value">Universe Size (Filtered)</div>
+                        <div class="sub-value">Universe Size (Persona Based)</div>
                     </div>
                     <div style="text-align: right; border-left: 1px solid #00f2ff33; padding-left: 20px;">
                         <div class="value" style="color:#00f2ff;">{r1_perc}%</div>
-                        <div class="sub-value">{r1_abs:,} People Reached</div>
+                        <div class="sub-value">{r1_abs:,} People Reached (1+)</div>
                     </div>
                 </div>
             </div>''', unsafe_allow_html=True)
 
     with c3: st.markdown(f'''
         <div class="metric-card-impact" style="border-left: 5px solid {f_color};">
-            {get_label("Actual Frequency", "Ek average insaan aapka ad kitni baar dekhega. 4+ frequency se brand yaad rehta hai.")}
+            {get_label("Actual Frequency", "Avg times your ad is seen. 1-3 is awareness, 4+ is behavior change.")}
             <div class="value" style="color:{f_color};">{freq}</div>
             <div class="status-badge" style="background:{f_color}">{f_tier}</div>
             <div class="sub-value">1.3x Wastage Applied</div>
@@ -206,17 +215,19 @@ if execute:
         
     with c4: st.markdown(f'''
         <div class="metric-card">
-            {get_label("Total Budget", "Is specific audience ko reach karne ke liye total investment. Urban rates Rural se thode high hote hain.")}
+            {get_label("Total Budget", "Total pocket money needed. Urban markets have higher eCPMs due to competition.")}
             <div class="value">₹{int(est_budget):,}</div>
             <div class="sub-value">at ₹{d_ecpm} eCPM</div>
         </div>''', unsafe_allow_html=True)
 
+    
+
     st.markdown('<div class="section-header">EFFICIENCY & PENETRATION</div>', unsafe_allow_html=True)
     b1, b2, b3, b4 = st.columns(4)
-    with b1: st.markdown(f'<div class="metric-card">{get_label("Cost / Person", "Ek unique person tak pahunchne ka kharcha. Ye aksar kuch paise hi hota hai.")}<div class="value">₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}</div><div class="sub-value">Per Unique Head</div></div>', unsafe_allow_html=True)
-    with b2: st.markdown(f'<div class="metric-card">{get_label("eCPM", "Har 1,000 ad views ka wholesale price.")}<div class="value">₹{d_ecpm}</div><div class="sub-value">Market Rate</div></div>', unsafe_allow_html=True)
-    with b3: st.markdown(f'<div class="metric-card">{get_label("Market Shout", "Share of Voice (SOV). Digital market mein aapka dabdaba kitna hai.")}<div class="value">{sov_val}%</div><div class="sub-value">SOV %</div></div>', unsafe_allow_html=True)
-    with b4: st.markdown(f'<div class="metric-card">{get_label("Total Views", "Poore campaign ke dauran ads kul kitni baar screen par dikhe.")}<div class="value">{total_imps:,}</div><div class="sub-value">Gross Impressions</div></div>', unsafe_allow_html=True)
+    with b1: st.markdown(f'<div class="metric-card">{get_label("Cost / Person", "Cost to reach one unique head in your NCCS group.")}<div class="value">₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}</div><div class="sub-value">Per Unique Head</div></div>', unsafe_allow_html=True)
+    with b2: st.markdown(f'<div class="metric-card">{get_label("eCPM", "Effective Wholesale price for 1,000 ad views.")}<div class="value">₹{d_ecpm}</div><div class="sub-value">Market Rate</div></div>', unsafe_allow_html=True)
+    with b3: st.markdown(f'<div class="metric-card">{get_label("Market Shout", "Share of Voice (SOV). How loud you are in the digital noise.")}<div class="value">{sov_val}%</div><div class="sub-value">SOV %</div></div>', unsafe_allow_html=True)
+    with b4: st.markdown(f'<div class="metric-card">{get_label("Total Views", "Total ad displays across the chosen weeks.")}<div class="value">{total_imps:,}</div><div class="sub-value">Gross Impressions</div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-header">AI STRATEGIC PLACEMENT (PREDICTED)</div>', unsafe_allow_html=True)
     try:
