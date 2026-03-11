@@ -1,61 +1,59 @@
 import streamlit as st
 import pandas as pd
-import google.generativeai as genai
+from google import genai
 import math
 import numpy as np
 from scipy import stats
 
 # --- 1. SYSTEM & API CONFIG ---
-st.set_page_config(page_title="Virtual Media Planner 2026", layout="wide", page_icon="📡")
+st.set_page_config(page_title="Virtual Digital Media Planning Tool", layout="wide", page_icon="📡")
 
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
-    genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-2.0-flash') 
-except:
+    client = genai.Client(api_key=API_KEY)
+except Exception as e:
     st.error("Setup Error: Ensure GEMINI_API_KEY is in secrets.")
     st.stop()
 
-# --- 2. TERMINAL & TOOLTIP STYLING ---
+# --- 2. NEON-TERMINAL STYLING ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;900&display=swap');
     
     .stApp { background-color: #050505 !important; font-family: 'Inter', sans-serif !important; }
-    [data-testid="stSidebar"] { background-color: #0a0a0a !important; border-right: 1px solid #00f2ff33; min-width: 380px !important; }
+    [data-testid="stSidebar"] { background-color: #0a0a0a !important; border-right: 1px solid #00f2ff33; min-width: 420px !important; }
     
     .metric-card, .metric-card-impact {
-        background: rgba(10, 10, 10, 0.8); border: 1px solid #00f2ff33;
+        background: rgba(0, 0, 0, 0.6); border: 1px solid #00f2ff33;
+        box-shadow: 0 0 15px rgba(0, 242, 255, 0.1);
         padding: 1.5rem; border-radius: 12px; border-left: 5px solid #00f2ff;
-        min-height: 200px; position: relative; display: flex; flex-direction: column; justify-content: space-between;
+        min-height: 180px; display: flex; flex-direction: column; justify-content: space-between;
     }
     .metric-card-impact { border-color: #bc13fe33; border-left: 5px solid #bc13fe; }
     
-    .info-container { position: absolute; top: 12px; right: 12px; cursor: help; }
-    .info-icon { color: #00f2ff; border: 1px solid #00f2ff; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; }
-    .info-container:hover .tooltip-text { visibility: visible; opacity: 1; }
-    .tooltip-text {
-        visibility: hidden; width: 240px; background-color: #1e293b; color: #fff; text-align: left;
-        border-radius: 8px; padding: 12px; position: absolute; z-index: 99; bottom: 125%; left: 50%;
-        margin-left: -120px; opacity: 0; transition: opacity 0.3s; font-size: 0.8rem; line-height: 1.4;
-        border: 1px solid #00f2ff; box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+    .tooltip { position: relative; display: inline-block; cursor: help; margin-left: 5px; color: #00f2ff; font-size: 0.8rem; }
+    .tooltip .tooltiptext {
+        visibility: hidden; width: 260px; background-color: #111; color: #fff;
+        border-radius: 6px; padding: 12px; position: absolute; z-index: 100;
+        bottom: 125%; left: 50%; margin-left: -130px; opacity: 0; transition: opacity 0.3s;
+        border: 1px solid #00f2ff; font-family: 'Inter', sans-serif; font-size: 0.8rem; text-transform: none; letter-spacing: 0;
     }
+    .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; box-shadow: 0 0 15px #00f2ff55; }
 
-    .label { color: #00f2ff; font-family: 'JetBrains Mono'; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
+    .label { color: #00f2ff; font-family: 'JetBrains Mono'; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; display: flex; align-items: center; }
     .value { color: #ffffff; font-size: 2.1rem; font-weight: 900; margin-top: 5px; }
-    .sub-value { font-size: 0.75rem; color: #888; font-weight: 500; }
-    .outcome-text { font-size: 0.75rem; color: #eee; margin-top: 8px; font-style: italic; line-height: 1.3; font-weight: 600; }
+    .sub-value { font-size: 0.8rem; color: #888; margin-top: 8px; font-weight: 500; }
+    .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; margin-top: 10px; display: inline-block; color: white; text-transform: uppercase; }
     
     .section-header {
         background: linear-gradient(90deg, #00f2ff11 0%, transparent 100%);
-        padding: 10px 20px; border-left: 3px solid #00f2ff;
+        padding: 12px 20px; border-radius: 4px; border-left: 3px solid #00f2ff;
         color: #00f2ff; font-weight: 800; margin: 30px 0 15px 0; font-size: 0.9rem; letter-spacing: 2px;
     }
-    .sov-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.65rem; font-weight: 800; margin-top: 10px; display: inline-block; color: white; text-transform: uppercase; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE (FULL 2026 INDIA GEO) ---
+# --- 3. DATABASE (LOCKED) ---
 INDIA_GEO_DATABASE = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara", "North West Delhi", "South East Delhi"],
@@ -96,125 +94,118 @@ INDIA_GEO_DATABASE = {
         "Sikkim": ["Gangtok", "Namchi", "Geyzing"]
     }
 }
-METROS = ["Mumbai", "Delhi", "Bengaluru", "Kolkata", "Chennai", "Hyderabad", "Ahmedabad", "Pune"]
 
-# --- 4. ENGINE: RECALIBRATED BREAKTHROUGH LOGIC ---
-def calculate_terminal_physics(reach_goal_n, n_plus, weeks, m_type):
+# --- 4. ENGINE ---
+def calculate_breakthrough_physics(reach_goal_n, n_plus, weeks, m_type):
     l_raw = 0
-    for l in np.arange(0.1, 250.0, 0.1):
-        if (1 - stats.poisson.cdf(n_plus - 1, l)) * 100 >= reach_goal_n:
+    for l in np.arange(0.1, 150.0, 0.1):
+        if (stats.poisson.sf(n_plus - 1, l)) * 100 >= reach_goal_n:
             l_raw = l
             break
+    l_impact = l_raw * 1.3
+    if l_impact < 6: f_tier, f_color = "Forgettable", "#64748B"
+    elif 6 <= l_impact < 10: f_tier, f_color = "Challenger", "#94a3b8"
+    elif 10 <= l_impact <= 12: f_tier, f_color = "Sweet Spot", "#00f2ff"
+    else: f_tier, f_color = "Dominant", "#bc13fe"
     
-    # Recency Maintenance Factor: Combatting memory decay over time
-    maintenance_load = 1 + (weeks - 1) * 0.12
-    l_impact = round(l_raw * 1.3 * maintenance_load, 1) 
-    
-    # Frequency Grading
-    if l_impact < 6.0:
-        f_tier, f_color, f_outcome = "FORGETTABLE", "#64748B", "High wastage; brand signal is lost in digital noise."
-    elif 6.0 <= l_impact < 10.0:
-        f_tier, f_color, f_outcome = "CHALLENGER", "#00f2ff", "Establishing presence; requires high creative salience."
-    elif 10.0 <= l_impact <= 12.0:
-        f_tier, f_color, f_outcome = "SWEET SPOT", "#22C55E", "Optimal Recall. High probability of Aided Awareness."
-    else:
-        f_tier, f_color, f_outcome = "DOMINANT", "#bc13fe", "Category ownership; risk of creative fatigue (Ad Wear-out)."
-
+    reach_1p = (1 - math.exp(-l_impact)) * 100
     capacity = 60 if m_type == "Urban" else 35
-    sov = round((l_impact / (capacity * weeks)) * 100, 1)
-    
-    if sov < 10: s_tier, s_color = "THIN", "#64748B"
-    elif sov < 25: s_tier, s_color = "STRONG", "#00f2ff"
-    else: s_tier, s_color = "AGGRESSIVE", "#EF4444"
-
-    reach_1p = round((1 - math.exp(-l_impact)) * 100, 1)
+    sov = (l_impact / (capacity * weeks)) * 100
     base_ecpm = 175 if m_type == "Urban" else 105
-    dynamic_ecpm = round(base_ecpm * (1 + (sov / 100)), 2)
-    
-    return l_impact, reach_1p, sov, f_tier, f_color, f_outcome, s_tier, s_color, dynamic_ecpm
+    d_ecpm = base_ecpm * (1 + (sov / 100))
+    return round(l_impact, 1), f_tier, f_color, round(reach_1p, 1), round(sov, 1), round(d_ecpm, 2)
 
-# --- 5. UI COMPONENTS ---
-def metric_card_with_badge(label, value, sub_value, badge_text, badge_color, outcome_text, definition, is_impact=True):
-    card_class = "metric-card-impact" if is_impact else "metric-card"
-    st.markdown(f"""
-        <div class="{card_class}" style="border-left: 5px solid {badge_color};">
-            <div class="info-container"><div class="info-icon">i</div><span class="tooltip-text">{definition}</span></div>
-            <div><div class="label">{label}</div><div class="value">{value}</div><div class="sov-badge" style="background:{badge_color}">{badge_text}</div></div>
-            <div><div class="outcome-text">{outcome_text}</div><div class="sub-value" style="margin-top:4px;">{sub_value}</div></div>
-        </div>
-    """, unsafe_allow_html=True)
-
-def standard_card(label, value, sub_value, definition):
-    st.markdown(f"""
-        <div class="metric-card">
-            <div class="info-container"><div class="info-icon">i</div><span class="tooltip-text">{definition}</span></div>
-            <div><div class="label">{label}</div><div class="value">{value}</div></div>
-            <div class="sub-value">{sub_value}</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-# --- 6. SIDEBAR COMMANDS ---
+# --- 5. SIDEBAR ---
 with st.sidebar:
-    st.markdown("<h2 style='color:#00f2ff; font-family:JetBrains Mono;'>PLANNING_COMMAND</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:#00f2ff; font-family:JetBrains Mono;'>PLANNING_INPUTS</h2>", unsafe_allow_html=True)
     m_type = st.radio("Market Type", ["Urban", "Rural"], horizontal=True)
-    
-    st.markdown("---")
-    sel_age = st.multiselect("Age Cohorts", ["15-24", "25-34", "35-44", "45+"], default=["15-24", "25-34"])
-    sel_gender = st.radio("Gender", ["Both", "Male", "Female"], horizontal=True)
+    sel_age = st.multiselect("Target Age", ["15-24", "25-34", "35-44", "45+"], default=["15-24", "25-34"])
+    sel_gender = st.radio("Gender Selection", ["Both", "Male", "Female"], horizontal=True)
     sel_nccs = st.multiselect("NCCS Group", ["A", "B", "C", "D", "E"], default=["A", "B"])
-
+    
     st.markdown("---")
-    zone_options = ["8 Metros"] + list(INDIA_GEO_DATABASE.keys())
-    sel_zones = st.multiselect("Select Zones", zone_options, default=["8 Metros"])
+    sel_zones = st.multiselect("Select Zones", list(INDIA_GEO_DATABASE.keys()))
     
-    if "8 Metros" in sel_zones:
-        sel_districts = st.multiselect("Top 8 Metros", sorted(METROS), default=["Mumbai", "Delhi", "Bengaluru"])
-    else:
-        avail_states = []
-        for z in (sel_zones if sel_zones else INDIA_GEO_DATABASE.keys()):
-            avail_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
-        sel_states_input = st.multiselect("Select States", sorted(list(set(avail_states))))
-        
-        avail_districts = []
-        for z in INDIA_GEO_DATABASE:
-            for s in sel_states_input:
-                if s in INDIA_GEO_DATABASE[z]: avail_districts.extend(INDIA_GEO_DATABASE[z][s])
-        sel_districts = st.multiselect("Select Districts", sorted(avail_districts))
+    available_states = []
+    zones_to_search = sel_zones if sel_zones else INDIA_GEO_DATABASE.keys()
+    for z in zones_to_search:
+        available_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
+    sel_states = st.multiselect("Select States", sorted(available_states))
     
+    available_districts = []
+    if sel_states:
+        for z in zones_to_search:
+            for s in sel_states:
+                if s in INDIA_GEO_DATABASE[z]:
+                    available_districts.extend(INDIA_GEO_DATABASE[z][s])
+    sel_districts = st.multiselect("Select Districts", sorted(available_districts))
+
     st.markdown("---")
     r_goal = st.slider("Reach Target % @ N+", 5, 95, 45)
-    n_eff = st.number_input("Freq Threshold (N+)", 1, 15, 3)
+    n_eff = st.number_input("Freq Threshold (N+)", 1, 15, 4)
     weeks = st.slider("Duration (Weeks)", 1, 12, 4)
     execute = st.button("EXECUTE IMPACT PLAN", use_container_width=True)
 
-# --- 7. MAIN DASHBOARD ---
-st.markdown('<p style="font-size:2.8rem; font-weight:900; color:white; margin-bottom:0;">VIRTUAL <span style="color:#00f2ff;">MEDIA PLANNER</span></p>', unsafe_allow_html=True)
+# --- 6. DASHBOARD ---
+st.markdown('<p style="font-size:2.8rem; font-weight:900; color:white; margin-bottom:0;">VIRTUAL DIGITAL <span style="color:#00f2ff;">MEDIA PLANNING TOOL</span></p>', unsafe_allow_html=True)
+
+def get_label(text, info):
+    return f'<div class="label">{text}<div class="tooltip">ⓘ<span class="tooltiptext">{info}</span></div></div>'
 
 if execute:
-    freq, r1_perc, sov_val, f_tier, f_color, f_outcome, s_tier, s_color, d_ecpm = calculate_terminal_physics(r_goal, n_eff, weeks, m_type)
+    freq, f_tier, f_color, r1_perc, sov_val, d_ecpm = calculate_breakthrough_physics(r_goal, n_eff, weeks, m_type)
     
-    # TAM Math
-    geo_count = len(sel_districts) if sel_districts else 1
-    universe = int(950000000 * (geo_count / 750) * (len(sel_age)/4) * (len(sel_nccs)/5) * 1.4) 
+    # Universe Calculation: Scale 950M base by selected cohorts
+    age_weight = len(sel_age) / 4
+    nccs_weight = len(sel_nccs) / 5
+    gender_weight = 0.5 if sel_gender != "Both" else 1.0
+    geo_weight = (len(sel_districts) if sel_districts else (len(available_districts) if sel_states else 700)) / 700
+    
+    universe = int(950000000 * age_weight * nccs_weight * gender_weight * geo_weight)
     r1_abs = int(universe * (r1_perc / 100))
     total_imps = int(r1_abs * freq)
     est_budget = (total_imps / 1000) * d_ecpm
 
+    st.markdown('<div class="section-header">CORE IMPACT METRICS</div>', unsafe_allow_html=True)
+    
+    c1_2, c3, c4 = st.columns([2, 1, 1])
+    
+    with c1_2: 
+        st.markdown(f'''
+            <div class="metric-card">
+                {get_label("Potential Audience", "We took the 950M people on the internet and filtered them by your choice of Age, NCCS, Gender, and Cities. This shows both the total pool and how many we will actually reach.")}
+                <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                    <div>
+                        <div class="value">{universe:,}</div>
+                        <div class="sub-value">Universe Size (Filtered)</div>
+                    </div>
+                    <div style="text-align: right; border-left: 1px solid #00f2ff33; padding-left: 20px;">
+                        <div class="value" style="color:#00f2ff;">{r1_perc}%</div>
+                        <div class="sub-value">{r1_abs:,} People Reached</div>
+                    </div>
+                </div>
+            </div>''', unsafe_allow_html=True)
+
+    with c3: st.markdown(f'''
+        <div class="metric-card-impact" style="border-left: 5px solid {f_color};">
+            {get_label("Actual Frequency", "The average number of times one person sees your ad. Once is just a glance, but 4+ times makes them remember you.")}
+            <div class="value" style="color:{f_color};">{freq}</div>
+            <div class="status-badge" style="background:{f_color}">{f_tier}</div>
+            <div class="sub-value">1.3x Wastage Applied</div>
+        </div>''', unsafe_allow_html=True)
+        
+    with c4: st.markdown(f'''
+        <div class="metric-card">
+            {get_label("Total Budget", "The total pocket money needed to run this plan for the chosen weeks at the effective wholesale rate.")}
+            <div class="value">₹{int(est_budget):,}</div>
+            <div class="sub-value">at ₹{d_ecpm} eCPM</div>
+        </div>''', unsafe_allow_html=True)
+
     
 
-    st.markdown('<div class="section-header">IMPACT METRICS</div>', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: standard_card("Target TAM", f"{universe:,}", "Total Audience", "The total number of unique people in your chosen age and location. Think of this as the size of the whole stadium.")
-    with c2: standard_card("Reach @ 1+", f"{r1_perc}%", f"{r1_abs:,} People", "The % of your audience who sees the ad at least once. It's like the number of people who look at your billboard.")
-    with c3: metric_card_with_badge("Impact Frequency", freq, f"{total_imps:,} Total Imps", f_tier, f_color, f_outcome, "The average times one person sees your ad. We adjust this based on the number of weeks to ensure your brand stays in their memory.")
-    with c4: metric_card_with_badge("Market SOV", f"{sov_val}%", "Share of Voice", s_tier, s_color, "Presence vs Market Capacity", "How much of the digital conversation you own. Higher SOV means you are louder than your competitors.")
-
-    st.markdown('<div class="section-header">FINANCIALS</div>', unsafe_allow_html=True)
-    f1, f2, f3, f4 = st.columns(4)
-    with f1: standard_card("Total Budget", f"₹{int(est_budget):,}", "Est. Investment", "The total cost to hit these targets. Longer durations and higher frequency will increase the budget.")
-    with f2: standard_card("Dynamic eCPM", f"₹{d_ecpm}", "Cost per 1k Imps", "The cost for 1,000 ad views. This price changes based on how much of the market capacity you occupy.")
-    with f3: standard_card("Cost / Unique", f"₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}", "Per Person reached", "Money spent to move one person from unaware to aware with high recall.")
-    with f4: standard_card("Efficiency", "OPTIMIZED", "Strategic Index", "A rating of your budget performance. We aim for the 'Sweet Spot' of frequency for maximum efficiency.")
-
-else:
-    st.info("Planner Ready. Adjust the sidebar settings and click 'Execute Impact Plan' to see the simulation.")
+    st.markdown('<div class="section-header">EFFICIENCY & PENETRATION</div>', unsafe_allow_html=True)
+    b1, b2, b3, b4 = st.columns(4)
+    with b1: st.markdown(f'<div class="metric-card">{get_label("Cost / Person", "How much you spend to reach just one person. Usually just a few paise!")}<div class="value">₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}</div><div class="sub-value">Per Unique Head</div></div>', unsafe_allow_html=True)
+    with b2: st.markdown(f'<div class="metric-card">{get_label("eCPM", "The wholesale price for every 1,000 times your ad is shown.")}<div class="value">₹{d_ecpm}</div><div class="sub-value">Effective CPM</div></div>', unsafe_allow_html=True)
+    with b3: st.markdown(f'<div class="metric-card">{get_label("Market Shout", "How much of the total conversation you own. High % means you drown out the noise.")}<div class="value">{sov_val}%</div><div class="sub-value">Share of Voice</div></div>', unsafe_allow_html=True)
+    with b4: st.markdown(f'<div class="metric-card">{get_label("Total Views", "The total number of times your ad was shown on screen across all people.")}<div class="value">{total_imps:,}</div><div class="sub-value">Gross Impressions</div></div>', unsafe_allow_html=True)
