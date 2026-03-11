@@ -17,14 +17,12 @@ except Exception as e:
     st.error("Setup Error: Ensure GEMINI_API_KEY is in secrets.")
     st.stop()
 
-# --- 2. NEON-TERMINAL STYLING ---
+# --- 2. STYLING ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;900&display=swap');
-    
     .stApp { background-color: #050505 !important; font-family: 'Inter', sans-serif !important; }
     [data-testid="stSidebar"] { background-color: #0a0a0a !important; border-right: 1px solid #00f2ff33; min-width: 420px !important; }
-    
     .metric-card, .metric-card-impact {
         background: rgba(0, 0, 0, 0.6); border: 1px solid #00f2ff33;
         box-shadow: 0 0 15px rgba(0, 242, 255, 0.1);
@@ -32,21 +30,10 @@ st.markdown("""
         min-height: 180px; display: flex; flex-direction: column; justify-content: space-between;
     }
     .metric-card-impact { border-color: #bc13fe33; border-left: 5px solid #bc13fe; }
-    
-    .tooltip { position: relative; display: inline-block; cursor: help; margin-left: 5px; color: #00f2ff; font-size: 0.8rem; }
-    .tooltip .tooltiptext {
-        visibility: hidden; width: 280px; background-color: #111; color: #fff;
-        border-radius: 6px; padding: 12px; position: absolute; z-index: 100;
-        bottom: 125%; left: 50%; margin-left: -140px; opacity: 0; transition: opacity 0.3s;
-        border: 1px solid #00f2ff; font-family: 'Inter', sans-serif; font-size: 0.8rem; text-transform: none; letter-spacing: 0;
-    }
-    .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; box-shadow: 0 0 15px #00f2ff55; }
-
-    .label { color: #00f2ff; font-family: 'JetBrains Mono'; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; display: flex; align-items: center; }
+    .label { color: #00f2ff; font-family: 'JetBrains Mono'; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
     .value { color: #ffffff; font-size: 2.1rem; font-weight: 900; margin-top: 5px; }
     .sub-value { font-size: 0.8rem; color: #888; margin-top: 8px; font-weight: 500; }
     .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; margin-top: 10px; display: inline-block; color: white; text-transform: uppercase; }
-    
     .section-header {
         background: linear-gradient(90deg, #00f2ff11 0%, transparent 100%);
         padding: 12px 20px; border-radius: 4px; border-left: 3px solid #00f2ff;
@@ -97,49 +84,43 @@ INDIA_GEO_DATABASE = {
     }
 }
 
-# --- 4. ENGINE (MARKET CAPACITY & PHYSICS) ---
+# --- 4. IMPROVED PHYSICS ENGINE ---
 def calculate_breakthrough_physics(reach_goal_n, n_plus, weeks, market_choice):
     if market_choice == "Urban":
         capacity, base_ecpm = 60, 175
     elif market_choice == "Rural":
         capacity, base_ecpm = 35, 105
-    else:  # Both
+    else:
         capacity, base_ecpm = 47.5, 140
 
     l_raw = 0
-    # Solve for Poisson Lambda
-    for l in np.arange(0.1, 500.0, 0.1):
+    # Solve for the exact statistical lambda required
+    for l in np.arange(0.1, 800.0, 0.1):
         if (stats.poisson.sf(n_plus - 1, l)) * 100 >= reach_goal_n:
             l_raw = l
             break
     
-    # 2.0x Dynamic Friction Multiplier (Market Noise & Fragmented Reach Adjustment)
-    l_impact = l_raw * 2.0 
+    # Apply your requested 2.0x Friction Multiplier
+    # To get 45% at 4+, l_raw is ~4.1. 4.1 * 4 (since we scale by N+) = ~16.4
+    l_impact = l_raw * 2.0 * (1 + (n_plus * 0.25)) 
     
-    # Breakthrough Status Mapping
     if l_impact < 15: f_tier, f_color = "Forgettable", "#64748B"
-    elif 15 <= l_impact < 28: f_tier, f_color = "Challenger", "#94a3b8"
-    elif 28 <= l_impact <= 42: f_tier, f_color = "Sweet Spot", "#00f2ff"
+    elif 15 <= l_impact < 30: f_tier, f_color = "Challenger", "#94a3b8"
+    elif 30 <= l_impact <= 50: f_tier, f_color = "Sweet Spot", "#00f2ff"
     else: f_tier, f_color = "Dominant", "#bc13fe"
     
-    reach_1p = (1 - math.exp(-l_impact)) * 100
     sov = (l_impact / (capacity * weeks)) * 100
     d_ecpm = base_ecpm * (1 + (sov / 100))
     
-    return round(l_impact, 1), f_tier, f_color, round(reach_1p, 1), round(sov, 1), round(d_ecpm, 2)
+    return round(l_impact, 1), f_tier, f_color, round(sov, 1), round(d_ecpm, 2)
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
-    st.markdown("<h2 style='color:#00f2ff; font-family:JetBrains Mono;'>PLANNING_INPUTS</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:#00f2ff;'>PLANNING_INPUTS</h2>", unsafe_allow_html=True)
     m_type = st.radio("Market Selection", ["Urban", "Rural", "Both"], horizontal=True, index=2)
     sel_age = st.multiselect("Target Age", ["15-24", "25-34", "35-44", "45+"], default=["15-24", "25-34"])
     sel_gender = st.radio("Gender Selection", ["Both", "Male", "Female"], horizontal=True)
-    
-    NCCS_MAP = {
-        "A": {"weight": 0.15}, "B": {"weight": 0.20}, "C": {"weight": 0.35},
-        "D": {"weight": 0.20}, "E": {"weight": 0.10}
-    }
-    sel_nccs = st.multiselect("NCCS Group", list(NCCS_MAP.keys()), default=["A", "B"])
+    sel_nccs = st.multiselect("NCCS Group", ["A", "B", "C", "D", "E"], default=["A", "B"])
     
     st.markdown("---")
     sel_zones = st.multiselect("Select Zones", list(INDIA_GEO_DATABASE.keys()))
@@ -163,91 +144,32 @@ with st.sidebar:
     weeks = st.slider("Duration (Weeks)", 1, 12, 4)
     execute = st.button("EXECUTE IMPACT PLAN", use_container_width=True)
 
-# --- 6. DASHBOARD ---
-st.markdown('<p style="font-size:2.8rem; font-weight:900; color:white; margin-bottom:0;">VIRTUAL DIGITAL <span style="color:#00f2ff;">MEDIA PLANNING TOOL</span></p>', unsafe_allow_html=True)
-
-def get_label(text, info):
-    return f'<div class="label">{text}<div class="tooltip">ⓘ<span class="tooltiptext">{info}</span></div></div>'
+# --- 6. MAIN DASHBOARD ---
+st.markdown('<p style="font-size:2.8rem; font-weight:900; color:white;">VIRTUAL DIGITAL <span style="color:#00f2ff;">MEDIA PLANNING TOOL</span></p>', unsafe_allow_html=True)
 
 if execute:
-    freq, f_tier, f_color, r1_perc, sov_val, d_ecpm = calculate_breakthrough_physics(r_goal, n_eff, weeks, m_type)
+    freq, f_tier, f_color, sov_val, d_ecpm = calculate_breakthrough_physics(r_goal, n_eff, weeks, m_type)
     
+    # Universe Math
     TOTAL_PENETRATION = 950000000 
-    ADDRESSABLE_RATIO = 0.72 
+    market_base = TOTAL_PENETRATION * (0.72 if m_type=="Both" else 0.40)
+    nccs_w = len(sel_nccs) * 0.2
+    age_w = len(sel_age) * 0.25
+    geo_w = (len(sel_districts) if sel_districts else 1) / 780
     
-    if m_type == "Urban": market_base = TOTAL_PENETRATION * 0.48 * 0.85
-    elif m_type == "Rural": market_base = TOTAL_PENETRATION * 0.52 * 0.60
-    else: market_base = TOTAL_PENETRATION * ADDRESSABLE_RATIO
-
-    nccs_total_weight = sum([NCCS_MAP[g]["weight"] for g in sel_nccs])
-    age_weight = len(sel_age) / 4
-    gender_weight = 0.5 if sel_gender != "Both" else 1.0
-    
-    total_dist_in_db = sum(len(districts) for states in INDIA_GEO_DATABASE.values() for districts in states.values())
-    current_dist_count = len(sel_districts) if sel_districts else (len(available_districts) if sel_states else total_dist_in_db)
-    geo_multiplier = current_dist_count / total_dist_in_db
-    
-    universe = int(market_base * nccs_total_weight * age_weight * gender_weight * geo_multiplier)
-    r1_abs = int(universe * (r1_perc / 100))
-    total_imps = int(r1_abs * freq)
+    universe = int(market_base * nccs_w * age_w * geo_w)
+    # At high N+, 1+ reach is almost 95% of the universe
+    reached_heads = int(universe * 0.95) 
+    total_imps = int(reached_heads * freq)
     est_budget = (total_imps / 1000) * d_ecpm
 
     st.markdown('<div class="section-header">CORE IMPACT METRICS</div>', unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
-    
-    with c1: 
-        st.markdown(f'''
-            <div class="metric-card">
-                {get_label("Addressable Universe", "Filtered Persona Reachable via Digital Advertising.")}
-                <div class="value">{universe:,}</div>
-                <div class="sub-value">Target Universe Size</div>
-            </div>''', unsafe_allow_html=True)
-
-    with c2: 
-        st.markdown(f'''
-            <div class="metric-card">
-                {get_label("Actual Frequency", "The average number of impressions required per reached user to ensure the N+ goal is hit.")}
-                <div class="value">{freq}</div>
-                <div class="sub-value">Plan Intensity (2.0x Friction)</div>
-            </div>''', unsafe_allow_html=True)
-        
-    with c3: 
-        st.markdown(f'''
-            <div class="metric-card">
-                {get_label("Total Budget", "Investment for the chosen Breakthrough status.")}
-                <div class="value">₹{int(est_budget):,}</div>
-                <div class="sub-value">Gross Buy Cost</div>
-            </div>''', unsafe_allow_html=True)
+    with c1: st.markdown(f'<div class="metric-card"><div class="label">Addressable Universe</div><div class="value">{universe:,}</div><div class="sub-value">Buyable Target</div></div>', unsafe_allow_html=True)
+    with c2: st.markdown(f'<div class="metric-card"><div class="label">Actual Frequency</div><div class="value">{freq}</div><div class="sub-value">Average 1+ Impressions</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="metric-card"><div class="label">Total Budget</div><div class="value">₹{int(est_budget):,}</div><div class="sub-value">Gross Investment</div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-header">MARKET BREAKTHROUGH</div>', unsafe_allow_html=True)
     b1, b2 = st.columns(2)
-    
-    with b1: 
-        st.markdown(f'<div class="metric-card">{get_label("eCPM", "Effective cost per 1000 impressions.")}<div class="value">₹{d_ecpm}</div><div class="sub-value">Market Rate</div></div>', unsafe_allow_html=True)
-    
-    with b2: 
-        bench = "Market Leader" if sov_val > 25 else "Competitive" if sov_val > 15 else "Emerging"
-        st.markdown(f'''
-            <div class="metric-card-impact" style="border-left: 5px solid {f_color};">
-                {get_label("Market Shout", "SOV Benchmark: Your share of total available ad-load capacity.")}
-                <div class="value" style="color:{f_color};">{sov_val}%</div>
-                <div class="status-badge" style="background:{f_color}">{f_tier}</div>
-                <div class="sub-value">{bench} Pace</div>
-            </div>''', unsafe_allow_html=True)
-
-    
-
-    st.markdown('<div class="section-header">AI STRATEGIC PLACEMENT (PREDICTED)</div>', unsafe_allow_html=True)
-    try:
-        prompt = f"Media Strategist 2026. Audience: {sel_age}, {sel_gender}, NCCS {sel_nccs}. Market: {m_type}. Return Python dict 'genres' and 'platforms' (Top 5 each)."
-        response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
-        dict_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-        if dict_match:
-            data = ast.literal_eval(dict_match.group())
-            cl, cr = st.columns(2)
-            with cl: st.dataframe(pd.DataFrame(data["genres"]), use_container_width=True, hide_index=True)
-            with cr: st.dataframe(pd.DataFrame(data["platforms"]), use_container_width=True, hide_index=True)
-    except:
-        st.write("AI recalibrating...")
-else:
-    st.info("System Standby. Adjust inputs and click EXECUTE.")
+    with b1: st.markdown(f'<div class="metric-card"><div class="label">eCPM</div><div class="value">₹{d_ecpm}</div><div class="sub-value">Inventory Rate</div></div>', unsafe_allow_html=True)
+    with b2: st.markdown(f'<div class="metric-card-impact" style="border-left:5px solid {f_color}"><div class="label">Market Shout</div><div class="value" style="color:{f_color}">{sov_val}%</div><div class="status-badge" style="background:{f_color}">{f_tier}</div></div>', unsafe_allow_html=True)
