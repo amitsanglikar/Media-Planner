@@ -225,4 +225,10 @@ if execute:
         dict_match = re.search(r'\{.*\}', response.text, re.DOTALL)
         if dict_match:
             data = ast.literal_eval(dict_match.group())
-            cl, cr = st.columns(2
+            cl, cr = st.columns(2)
+            with cl: st.dataframe(pd.DataFrame(data["genres"]), use_container_width=True, hide_index=True)
+            with cr: st.dataframe(pd.DataFrame(data["platforms"]), use_container_width=True, hide_index=True)
+    except:
+        st.write("AI insights are currently recalibrating...")
+else:
+    st.info("System Standby. Sidebar inputs adjust karein aur 'EXECUTE IMPACT PLAN' par click karein.")
