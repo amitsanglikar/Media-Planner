@@ -4,6 +4,8 @@ from google import genai
 import math
 import numpy as np
 from scipy import stats
+import re
+import ast
 
 # --- 1. SYSTEM & API CONFIG ---
 st.set_page_config(page_title="Virtual Digital Media Planning Tool", layout="wide", page_icon="📡")
@@ -53,7 +55,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE (LOCKED) ---
+# --- 3. DATABASE (FULL LIST) ---
 INDIA_GEO_DATABASE = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara", "North West Delhi", "South East Delhi"],
@@ -95,30 +97,38 @@ INDIA_GEO_DATABASE = {
     }
 }
 
-# --- 4. ENGINE ---
-def calculate_breakthrough_physics(reach_goal_n, n_plus, weeks, m_type):
+# --- 4. ENGINE (FIXED MARKET LOGIC) ---
+def calculate_breakthrough_physics(reach_goal_n, n_plus, weeks, market_choice):
+    if market_choice == "Urban":
+        capacity, base_ecpm = 60, 175
+    elif market_choice == "Rural":
+        capacity, base_ecpm = 35, 105
+    else:  # Both
+        capacity, base_ecpm = 47.5, 140
+
     l_raw = 0
     for l in np.arange(0.1, 150.0, 0.1):
         if (stats.poisson.sf(n_plus - 1, l)) * 100 >= reach_goal_n:
             l_raw = l
             break
-    l_impact = l_raw * 1.3
+    
+    l_impact = l_raw * 1.3 # 30% Wastage factor
+    
     if l_impact < 6: f_tier, f_color = "Forgettable", "#64748B"
     elif 6 <= l_impact < 10: f_tier, f_color = "Challenger", "#94a3b8"
     elif 10 <= l_impact <= 12: f_tier, f_color = "Sweet Spot", "#00f2ff"
     else: f_tier, f_color = "Dominant", "#bc13fe"
     
     reach_1p = (1 - math.exp(-l_impact)) * 100
-    capacity = 60 if m_type == "Urban" else 35
     sov = (l_impact / (capacity * weeks)) * 100
-    base_ecpm = 175 if m_type == "Urban" else 105
     d_ecpm = base_ecpm * (1 + (sov / 100))
+    
     return round(l_impact, 1), f_tier, f_color, round(reach_1p, 1), round(sov, 1), round(d_ecpm, 2)
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
     st.markdown("<h2 style='color:#00f2ff; font-family:JetBrains Mono;'>PLANNING_INPUTS</h2>", unsafe_allow_html=True)
-    m_type = st.radio("Market Type", ["Urban", "Rural"], horizontal=True)
+    m_type = st.radio("Market Selection", ["Urban", "Rural", "Both"], horizontal=True, index=2)
     sel_age = st.multiselect("Target Age", ["15-24", "25-34", "35-44", "45+"], default=["15-24", "25-34"])
     sel_gender = st.radio("Gender Selection", ["Both", "Male", "Female"], horizontal=True)
     sel_nccs = st.multiselect("NCCS Group", ["A", "B", "C", "D", "E"], default=["A", "B"])
@@ -155,7 +165,7 @@ def get_label(text, info):
 if execute:
     freq, f_tier, f_color, r1_perc, sov_val, d_ecpm = calculate_breakthrough_physics(r_goal, n_eff, weeks, m_type)
     
-    # Universe Calculation: Scale 950M base by selected cohorts
+    # Universe Logic: Scale 950M base (IAMAI/TRAI 2026)
     age_weight = len(sel_age) / 4
     nccs_weight = len(sel_nccs) / 5
     gender_weight = 0.5 if sel_gender != "Both" else 1.0
@@ -173,7 +183,7 @@ if execute:
     with c1_2: 
         st.markdown(f'''
             <div class="metric-card">
-                {get_label("Potential Audience", "We took the 950M people on the internet and filtered them by your choice of Age, NCCS, Gender, and Cities. This shows both the total pool and how many we will actually reach.")}
+                {get_label("Potential Audience", "Selected Age, NCCS, Gender aur Market ke basis par 950M internet users ko filter karke aapka target pool dikhata hai.")}
                 <div style="display: flex; justify-content: space-between; align-items: flex-end;">
                     <div>
                         <div class="value">{universe:,}</div>
@@ -188,7 +198,7 @@ if execute:
 
     with c3: st.markdown(f'''
         <div class="metric-card-impact" style="border-left: 5px solid {f_color};">
-            {get_label("Actual Frequency", "The average number of times one person sees your ad. Once is just a glance, but 4+ times makes them remember you.")}
+            {get_label("Actual Frequency", "Ek average insaan aapka ad kitni baar dekhega. 4+ frequency se brand yaad rehta hai.")}
             <div class="value" style="color:{f_color};">{freq}</div>
             <div class="status-badge" style="background:{f_color}">{f_tier}</div>
             <div class="sub-value">1.3x Wastage Applied</div>
@@ -196,16 +206,23 @@ if execute:
         
     with c4: st.markdown(f'''
         <div class="metric-card">
-            {get_label("Total Budget", "The total pocket money needed to run this plan for the chosen weeks at the effective wholesale rate.")}
+            {get_label("Total Budget", "Is specific audience ko reach karne ke liye total investment. Urban rates Rural se thode high hote hain.")}
             <div class="value">₹{int(est_budget):,}</div>
             <div class="sub-value">at ₹{d_ecpm} eCPM</div>
         </div>''', unsafe_allow_html=True)
 
-    
-
     st.markdown('<div class="section-header">EFFICIENCY & PENETRATION</div>', unsafe_allow_html=True)
     b1, b2, b3, b4 = st.columns(4)
-    with b1: st.markdown(f'<div class="metric-card">{get_label("Cost / Person", "How much you spend to reach just one person. Usually just a few paise!")}<div class="value">₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}</div><div class="sub-value">Per Unique Head</div></div>', unsafe_allow_html=True)
-    with b2: st.markdown(f'<div class="metric-card">{get_label("eCPM", "The wholesale price for every 1,000 times your ad is shown.")}<div class="value">₹{d_ecpm}</div><div class="sub-value">Effective CPM</div></div>', unsafe_allow_html=True)
-    with b3: st.markdown(f'<div class="metric-card">{get_label("Market Shout", "How much of the total conversation you own. High % means you drown out the noise.")}<div class="value">{sov_val}%</div><div class="sub-value">Share of Voice</div></div>', unsafe_allow_html=True)
-    with b4: st.markdown(f'<div class="metric-card">{get_label("Total Views", "The total number of times your ad was shown on screen across all people.")}<div class="value">{total_imps:,}</div><div class="sub-value">Gross Impressions</div></div>', unsafe_allow_html=True)
+    with b1: st.markdown(f'<div class="metric-card">{get_label("Cost / Person", "Ek unique person tak pahunchne ka kharcha. Ye aksar kuch paise hi hota hai.")}<div class="value">₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}</div><div class="sub-value">Per Unique Head</div></div>', unsafe_allow_html=True)
+    with b2: st.markdown(f'<div class="metric-card">{get_label("eCPM", "Har 1,000 ad views ka wholesale price.")}<div class="value">₹{d_ecpm}</div><div class="sub-value">Market Rate</div></div>', unsafe_allow_html=True)
+    with b3: st.markdown(f'<div class="metric-card">{get_label("Market Shout", "Share of Voice (SOV). Digital market mein aapka dabdaba kitna hai.")}<div class="value">{sov_val}%</div><div class="sub-value">SOV %</div></div>', unsafe_allow_html=True)
+    with b4: st.markdown(f'<div class="metric-card">{get_label("Total Views", "Poore campaign ke dauran ads kul kitni baar screen par dikhe.")}<div class="value">{total_imps:,}</div><div class="sub-value">Gross Impressions</div></div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="section-header">AI STRATEGIC PLACEMENT (PREDICTED)</div>', unsafe_allow_html=True)
+    try:
+        prompt = f"Media Strategist 2026. Audience: {sel_age}, {sel_gender}, NCCS {sel_nccs}. Market: {m_type}. Return Python dict 'genres' and 'platforms' (Top 5 each)."
+        response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+        dict_match = re.search(r'\{.*\}', response.text, re.DOTALL)
+        if dict_match:
+            data = ast.literal_eval(dict_match.group())
+            cl, cr = st.columns(2
