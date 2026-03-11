@@ -55,7 +55,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. DATABASE (LOCKED) ---
+# --- 3. DATABASE (GEO) ---
 INDIA_GEO_DATABASE = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara", "North West Delhi", "South East Delhi"],
@@ -97,7 +97,7 @@ INDIA_GEO_DATABASE = {
     }
 }
 
-# --- 4. ENGINE (MARKET CAPACITY & BREAKTHROUGH PHYSICS) ---
+# --- 4. ENGINE (MARKET CAPACITY & PHYSICS) ---
 def calculate_breakthrough_physics(reach_goal_n, n_plus, weeks, market_choice):
     if market_choice == "Urban":
         capacity, base_ecpm = 60, 175
@@ -112,7 +112,7 @@ def calculate_breakthrough_physics(reach_goal_n, n_plus, weeks, market_choice):
             l_raw = l
             break
     
-    l_impact = l_raw * 1.3 # Wastage factor
+    l_impact = l_raw * 1.3 
     
     if l_impact < 6: f_tier, f_color = "Forgettable", "#64748B"
     elif 6 <= l_impact < 10: f_tier, f_color = "Challenger", "#94a3b8"
@@ -132,14 +132,15 @@ with st.sidebar:
     sel_age = st.multiselect("Target Age", ["15-24", "25-34", "35-44", "45+"], default=["15-24", "25-34"])
     sel_gender = st.radio("Gender Selection", ["Both", "Male", "Female"], horizontal=True)
     
-    NCCS_DATA = {
-        "A": "Highly educated, Premium assets (AC/Car). High Income.",
-        "B": "Graduates, Basic comforts (Fridge/Bike). Stable Savings.",
-        "C": "Value-conscious, Middle school/Graduates.",
-        "D": "Primary education, Price sensitive mass.",
-        "E": "Lower socio-economic segment."
+    # ADDRESSABLE NCCS WEIGHTS (Adjusted for 2026 active ad-receptive audience)
+    NCCS_MAP = {
+        "A": {"weight": 0.15, "desc": "Premium (Ad-Addressable: 95%)"},
+        "B": {"weight": 0.20, "desc": "Upper Mid (Ad-Addressable: 85%)"},
+        "C": {"weight": 0.35, "desc": "Middle (Ad-Addressable: 70%)"},
+        "D": {"weight": 0.20, "desc": "Mass (Ad-Addressable: 55%)"},
+        "E": {"weight": 0.10, "desc": "Lower (Ad-Addressable: 40%)"}
     }
-    sel_nccs = st.multiselect("NCCS Group", list(NCCS_DATA.keys()), default=["A", "B"])
+    sel_nccs = st.multiselect("NCCS Group", list(NCCS_MAP.keys()), default=["A", "B"])
     
     st.markdown("---")
     sel_zones = st.multiselect("Select Zones", list(INDIA_GEO_DATABASE.keys()))
@@ -173,49 +174,66 @@ def get_label(text, info):
 if execute:
     freq, f_tier, f_color, r1_perc, sov_val, d_ecpm = calculate_breakthrough_physics(r_goal, n_eff, weeks, m_type)
     
-    # Universe Logic: Scale 950M base (IAMAI/TRAI 2026 trajectory)
-    age_weight = len(sel_age) / 4
-    nccs_weight = len(sel_nccs) / 5
-    gender_weight = 0.5 if sel_gender != "Both" else 1.0
-    geo_weight = (len(sel_districts) if sel_districts else (len(available_districts) if sel_states else 700)) / 700
+    # --- ADDRESSABLE UNIVERSE LOGIC ---
+    # 1. Total Digital Penetration Base
+    TOTAL_PENETRATION = 950000000 
+    # 2. Addressability Ratio (Active users on ad-supported platforms)
+    ADDRESSABLE_RATIO = 0.72 
     
-    universe = int(950000000 * age_weight * nccs_weight * gender_weight * geo_weight)
+    # 3. Market Distribution (Urban users are more addressable than Rural)
+    if m_type == "Urban":
+        market_base = TOTAL_PENETRATION * 0.48 * 0.85 # High addressability
+    elif m_type == "Rural":
+        market_base = TOTAL_PENETRATION * 0.52 * 0.60 # Lower addressability
+    else: # Both
+        market_base = TOTAL_PENETRATION * ADDRESSABLE_RATIO
+
+    # 4. NCCS & Demographics
+    nccs_total_weight = sum([NCCS_MAP[g]["weight"] for g in sel_nccs])
+    age_weight = len(sel_age) / 4
+    gender_weight = 0.5 if sel_gender != "Both" else 1.0
+    
+    # 5. Geo Multiplier
+    total_districts_in_india = 780
+    geo_multiplier = (len(sel_districts) if sel_districts else (len(available_districts) if sel_states else total_districts_in_india)) / total_districts_in_india
+    
+    # Final Addressable Universe
+    universe = int(market_base * nccs_total_weight * age_weight * gender_weight * geo_multiplier)
+    
     r1_abs = int(universe * (r1_perc / 100))
     total_imps = int(r1_abs * freq)
     est_budget = (total_imps / 1000) * d_ecpm
 
     st.markdown('<div class="section-header">CORE IMPACT METRICS</div>', unsafe_allow_html=True)
-    
     c1_2, c3, c4 = st.columns([2, 1, 1])
     
     with c1_2: 
-        nccs_hover = " | ".join([f"{g}: {NCCS_DATA[g]}" for g in sel_nccs])
         st.markdown(f'''
             <div class="metric-card">
-                {get_label("Potential Audience", f"Selected Persona: {nccs_hover}. Filters applied to 950M Internet Base.")}
+                {get_label("Addressable Universe", "Filtered from 950M Digital Penetration. This is the 'Real Buyable' audience active on ad-supported platforms.")}
                 <div style="display: flex; justify-content: space-between; align-items: flex-end;">
                     <div>
                         <div class="value">{universe:,}</div>
-                        <div class="sub-value">Universe Size (Persona Based)</div>
+                        <div class="sub-value">Buyable Target Persona</div>
                     </div>
                     <div style="text-align: right; border-left: 1px solid #00f2ff33; padding-left: 20px;">
                         <div class="value" style="color:#00f2ff;">{r1_perc}%</div>
-                        <div class="sub-value">{r1_abs:,} People Reached (1+)</div>
+                        <div class="sub-value">{r1_abs:,} Targeted Reach</div>
                     </div>
                 </div>
             </div>''', unsafe_allow_html=True)
 
     with c3: st.markdown(f'''
         <div class="metric-card-impact" style="border-left: 5px solid {f_color};">
-            {get_label("Actual Frequency", "Avg times your ad is seen. 1-3 is awareness, 4+ is behavior change.")}
+            {get_label("Actual Frequency", "Avg impressions per addressable user. 1.3x Wastage factored in.")}
             <div class="value" style="color:{f_color};">{freq}</div>
             <div class="status-badge" style="background:{f_color}">{f_tier}</div>
-            <div class="sub-value">1.3x Wastage Applied</div>
+            <div class="sub-value">Breakthrough Physics</div>
         </div>''', unsafe_allow_html=True)
         
     with c4: st.markdown(f'''
         <div class="metric-card">
-            {get_label("Total Budget", "Total pocket money needed. Urban markets have higher eCPMs due to competition.")}
+            {get_label("Total Budget", "Total buy required at market rates for your chosen SOV.")}
             <div class="value">₹{int(est_budget):,}</div>
             <div class="sub-value">at ₹{d_ecpm} eCPM</div>
         </div>''', unsafe_allow_html=True)
@@ -224,14 +242,14 @@ if execute:
 
     st.markdown('<div class="section-header">EFFICIENCY & PENETRATION</div>', unsafe_allow_html=True)
     b1, b2, b3, b4 = st.columns(4)
-    with b1: st.markdown(f'<div class="metric-card">{get_label("Cost / Person", "Cost to reach one unique head in your NCCS group.")}<div class="value">₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}</div><div class="sub-value">Per Unique Head</div></div>', unsafe_allow_html=True)
-    with b2: st.markdown(f'<div class="metric-card">{get_label("eCPM", "Effective Wholesale price for 1,000 ad views.")}<div class="value">₹{d_ecpm}</div><div class="sub-value">Market Rate</div></div>', unsafe_allow_html=True)
-    with b3: st.markdown(f'<div class="metric-card">{get_label("Market Shout", "Share of Voice (SOV). How loud you are in the digital noise.")}<div class="value">{sov_val}%</div><div class="sub-value">SOV %</div></div>', unsafe_allow_html=True)
-    with b4: st.markdown(f'<div class="metric-card">{get_label("Total Views", "Total ad displays across the chosen weeks.")}<div class="value">{total_imps:,}</div><div class="sub-value">Gross Impressions</div></div>', unsafe_allow_html=True)
+    with b1: st.markdown(f'<div class="metric-card">{get_label("Cost / Person", "Budget divided by unique people reached.")}<div class="value">₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}</div><div class="sub-value">Per Unique Head</div></div>', unsafe_allow_html=True)
+    with b2: st.markdown(f'<div class="metric-card">{get_label("eCPM", "Effective cost per 1000 impressions.")}<div class="value">₹{d_ecpm}</div><div class="sub-value">Wholesale Rate</div></div>', unsafe_allow_html=True)
+    with b3: st.markdown(f'<div class="metric-card">{get_label("Market Shout", "Your Share of Voice (SOV) in the digital market.")}<div class="value">{sov_val}%</div><div class="sub-value">SOV %</div></div>', unsafe_allow_html=True)
+    with b4: st.markdown(f'<div class="metric-card">{get_label("Total Views", "Total impressions generated across weeks.")}<div class="value">{total_imps:,}</div><div class="sub-value">Gross Impressions</div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-header">AI STRATEGIC PLACEMENT (PREDICTED)</div>', unsafe_allow_html=True)
     try:
-        prompt = f"Media Strategist 2026. Audience: {sel_age}, {sel_gender}, NCCS {sel_nccs}. Market: {m_type}. Return Python dict 'genres' and 'platforms' (Top 5 each)."
+        prompt = f"Media Strategist 2026. Audience: {sel_age}, {sel_gender}, NCCS {sel_nccs}. Market: {m_type}. Addressable Universe: {universe}. Return Python dict 'genres' and 'platforms' (Top 5 each)."
         response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
         dict_match = re.search(r'\{.*\}', response.text, re.DOTALL)
         if dict_match:
@@ -242,4 +260,4 @@ if execute:
     except:
         st.write("AI insights are currently recalibrating...")
 else:
-    st.info("System Standby. Sidebar inputs adjust karein aur 'EXECUTE IMPACT PLAN' par click karein.")
+    st.info("System Standby. Adjust inputs and click 'EXECUTE IMPACT PLAN'.")
