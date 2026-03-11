@@ -6,7 +6,7 @@ import numpy as np
 from scipy import stats
 
 # --- 1. SYSTEM & API CONFIG ---
-st.set_page_config(page_title="Impact Media Terminal 2026", layout="wide", page_icon="📡")
+st.set_page_config(page_title="Virtual Media Planner 2026", layout="wide", page_icon="📡")
 
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -100,20 +100,17 @@ METROS = ["Mumbai", "Delhi", "Bengaluru", "Kolkata", "Chennai", "Hyderabad", "Ah
 
 # --- 4. ENGINE: RECALIBRATED BREAKTHROUGH LOGIC ---
 def calculate_terminal_physics(reach_goal_n, n_plus, weeks, m_type):
-    # Step 1: Find Raw Lambda for the N+ goal using Poisson tail
     l_raw = 0
     for l in np.arange(0.1, 250.0, 0.1):
         if (1 - stats.poisson.cdf(n_plus - 1, l)) * 100 >= reach_goal_n:
             l_raw = l
             break
     
-    # Step 2: Recency/Duration Adjustment
-    # Every extra week requires more frequency to combat memory decay.
-    # We apply a 'Maintenance Multiplier' of ~12% per additional week.
+    # Recency Maintenance Factor: Combatting memory decay over time
     maintenance_load = 1 + (weeks - 1) * 0.12
-    l_impact = round(l_raw * 1.3 * maintenance_load, 1) # 1.3 is base Indian clutter factor
+    l_impact = round(l_raw * 1.3 * maintenance_load, 1) 
     
-    # Step 3: Frequency Grading (Your Logic)
+    # Frequency Grading
     if l_impact < 6.0:
         f_tier, f_color, f_outcome = "FORGETTABLE", "#64748B", "High wastage; brand signal is lost in digital noise."
     elif 6.0 <= l_impact < 10.0:
@@ -123,7 +120,6 @@ def calculate_terminal_physics(reach_goal_n, n_plus, weeks, m_type):
     else:
         f_tier, f_color, f_outcome = "DOMINANT", "#bc13fe", "Category ownership; risk of creative fatigue (Ad Wear-out)."
 
-    # Step 4: Market SOV Logic
     capacity = 60 if m_type == "Urban" else 35
     sov = round((l_impact / (capacity * weeks)) * 100, 1)
     
@@ -192,7 +188,7 @@ with st.sidebar:
     execute = st.button("EXECUTE IMPACT PLAN", use_container_width=True)
 
 # --- 7. MAIN DASHBOARD ---
-st.markdown('<p style="font-size:2.8rem; font-weight:900; color:white; margin-bottom:0;">BREAKTHROUGH <span style="color:#00f2ff;">TERMINAL</span></p>', unsafe_allow_html=True)
+st.markdown('<p style="font-size:2.8rem; font-weight:900; color:white; margin-bottom:0;">VIRTUAL <span style="color:#00f2ff;">MEDIA PLANNER</span></p>', unsafe_allow_html=True)
 
 if execute:
     freq, r1_perc, sov_val, f_tier, f_color, f_outcome, s_tier, s_color, d_ecpm = calculate_terminal_physics(r_goal, n_eff, weeks, m_type)
@@ -205,21 +201,20 @@ if execute:
     est_budget = (total_imps / 1000) * d_ecpm
 
     
-    
 
     st.markdown('<div class="section-header">IMPACT METRICS</div>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
     with c1: standard_card("Target TAM", f"{universe:,}", "Total Audience", "The total number of unique people in your chosen age and location. Think of this as the size of the whole stadium.")
     with c2: standard_card("Reach @ 1+", f"{r1_perc}%", f"{r1_abs:,} People", "The % of your audience who sees the ad at least once. It's like the number of people who look at your billboard.")
-    with c3: metric_card_with_badge("Impact Frequency", freq, f"{total_imps:,} Total Imps", f_tier, f_color, f_outcome, "The average times one person sees your ad. In India, people need to see an ad many times to remember it over 4 weeks.")
-    with c4: metric_card_with_badge("Market SOV", f"{sov_val}%", "Share of Voice", s_tier, s_color, "Presence vs Market Capacity", "How much of the digital conversation you own. Higher SOV means you are shouting louder than your rivals.")
+    with c3: metric_card_with_badge("Impact Frequency", freq, f"{total_imps:,} Total Imps", f_tier, f_color, f_outcome, "The average times one person sees your ad. We adjust this based on the number of weeks to ensure your brand stays in their memory.")
+    with c4: metric_card_with_badge("Market SOV", f"{sov_val}%", "Share of Voice", s_tier, s_color, "Presence vs Market Capacity", "How much of the digital conversation you own. Higher SOV means you are louder than your competitors.")
 
     st.markdown('<div class="section-header">FINANCIALS</div>', unsafe_allow_html=True)
     f1, f2, f3, f4 = st.columns(4)
-    with f1: standard_card("Total Budget", f"₹{int(est_budget):,}", "Est. Investment", "The total cost to hit these targets. More impact and longer duration increase this number.")
-    with f2: standard_card("Dynamic eCPM", f"₹{d_ecpm}", "Cost per 1k Imps", "The cost to show your ad 1,000 times. This gets more expensive as you try to dominate the market.")
-    with f3: standard_card("Cost / Unique", f"₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}", "Per Person reached", "The money spent to convert one person from a stranger into someone who remembers your brand.")
-    with f4: standard_card("Efficiency", "OPTIMIZED", "Strategic Index", "A rating of how well your money is working. We aim for the 'Sweet Spot' of frequency.")
+    with f1: standard_card("Total Budget", f"₹{int(est_budget):,}", "Est. Investment", "The total cost to hit these targets. Longer durations and higher frequency will increase the budget.")
+    with f2: standard_card("Dynamic eCPM", f"₹{d_ecpm}", "Cost per 1k Imps", "The cost for 1,000 ad views. This price changes based on how much of the market capacity you occupy.")
+    with f3: standard_card("Cost / Unique", f"₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}", "Per Person reached", "Money spent to move one person from unaware to aware with high recall.")
+    with f4: standard_card("Efficiency", "OPTIMIZED", "Strategic Index", "A rating of your budget performance. We aim for the 'Sweet Spot' of frequency for maximum efficiency.")
 
 else:
-    st.info("Terminal Ready. Adjust your Reach & Duration targets and click 'Execute'.")
+    st.info("Planner Ready. Adjust the sidebar settings and click 'Execute Impact Plan' to see the simulation.")
