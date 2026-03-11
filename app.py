@@ -31,7 +31,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. THE DEFINITIVE GEO DATABASE ---
+# --- 3. THE FULL GEO DATABASE ---
 INDIA_GEO_DATABASE = {
     "North": {
         "Delhi": ["Central Delhi", "East Delhi", "New Delhi", "North Delhi", "South Delhi", "West Delhi", "Shahdara", "North West Delhi", "South East Delhi"],
@@ -73,63 +73,66 @@ INDIA_GEO_DATABASE = {
     }
 }
 
-# --- 4. ENGINE (TIME-BASED REACH BUILD) ---
+# --- 4. ENGINE (FIXED SOV & FREQUENCY) ---
 def calculate_media_physics(reach_goal_n, n_plus, weeks, market_choice):
-    base_cap = 60 if market_choice == "Urban" else 35 if market_choice == "Rural" else 47.5
+    # Category Capacity (Impressions per person per week)
+    # Urban consumers see more ads than Rural
+    cap_per_week = 50 if market_choice == "Urban" else 25 if market_choice == "Rural" else 37.5
     base_ecpm = 175 if market_choice == "Urban" else 105 if market_choice == "Rural" else 140
 
-    # Iterative solver for λ (intensity)
+    # Solve for required intensity λ
     l_total = 0.01
-    for l in np.arange(0.01, 500.0, 0.05):
+    for l in np.arange(0.01, 600.0, 0.05):
         if (stats.poisson.sf(n_plus - 1, l)) * 100 >= reach_goal_n:
             l_total = l
             break
     
-    # R1 sensitivity: Longer duration builds more reach for the same N+ goal
-    # We use a Log-decay function to simulate how 'Weeks' builds the 1+ pool
-    duration_factor = 1.0 + (math.log(weeks) * 0.18)
-    r1_perc = (1 - math.exp(-l_total / duration_factor)) * 100
-    
-    # Cap and floor to keep it realistic
-    r1_perc = max(r1_perc, reach_goal_n * 1.15)
-    if r1_perc > 98: r1_perc = 98.0
+    # 1+ Reach build over time (Weeks)
+    # As weeks increase, 1+ Reach build is more efficient (Time-Decay)
+    time_decay = 1 + (math.log(weeks) * 0.22)
+    r1_perc = (1 - math.exp(-l_total / time_decay)) * 100
+    r1_perc = max(r1_perc, reach_goal_n * 1.1) # R1 cannot be less than Rn
+    if r1_perc > 97: r1_perc = 97.0
 
-    # Final Average Frequency (1+)
-    adj_freq = (l_total / (r1_perc / 100)) * 1.25 # Friction factor for clutter
+    # Frequency 1+
+    # Total impressions divided by 1+ reach, plus a clutter friction factor
+    avg_freq = (l_total / (r1_perc / 100)) * 1.3
     
-    sov = (adj_freq / (base_cap * weeks)) * 100
-    d_ecpm = base_ecpm * (1 + (sov / 100))
+    # SOV Calculation
+    # Total Weekly Frequency / Weekly Market Capacity
+    sov_perc = ((avg_freq / weeks) / cap_per_week) * 100
     
-    return round(adj_freq, 1), round(r1_perc, 1), round(sov, 1), round(d_ecpm, 2)
+    # Dynamic eCPM (Premium pricing for high SOV/Clutter)
+    d_ecpm = base_ecpm * (1 + (sov_perc / 100))
+    
+    return round(avg_freq, 1), round(r1_perc, 1), round(sov_perc, 1), round(d_ecpm, 2)
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
     st.markdown("<h2 style='color:#00f2ff;'>PLANNING_INPUTS</h2>", unsafe_allow_html=True)
     m_type = st.radio("Market Selection", ["Urban", "Rural", "Both"], index=2)
     
-    def all_selector(label, options, default):
-        opts = ["ALL"] + options
-        sel = st.multiselect(label, opts, default=default)
-        if "ALL" in sel: return options
-        return sel
+    def all_selector(label, options):
+        sel = st.multiselect(label, ["ALL"] + options, default=["ALL"])
+        return options if "ALL" in sel else sel
 
-    sel_age = all_selector("Target Age", ["15-24", "25-34", "35-44", "45+"], ["15-24", "25-34"])
-    sel_gender = st.radio("Gender Selection", ["Both", "Male", "Female"], horizontal=True)
-    sel_nccs = all_selector("NCCS Group", ["A", "B", "C", "D", "E"], ["A", "B"])
+    sel_age = all_selector("Target Age", ["15-24", "25-34", "35-44", "45+"])
+    sel_gender = st.radio("Gender", ["Both", "Male", "Female"], horizontal=True)
+    sel_nccs = all_selector("NCCS Group", ["A", "B", "C", "D", "E"])
     
     st.markdown("---")
-    sel_zones = all_selector("Select Zones", list(INDIA_GEO_DATABASE.keys()), [])
+    sel_zones = all_selector("Select Zones", list(INDIA_GEO_DATABASE.keys()))
     
     available_states = []
     for z in sel_zones: available_states.extend(list(INDIA_GEO_DATABASE[z].keys()))
-    sel_states = all_selector("Select States", sorted(available_states), [])
+    sel_states = all_selector("Select States", sorted(available_states))
     
     available_districts = []
     if sel_states:
         for z in sel_zones:
             for s in sel_states:
                 if s in INDIA_GEO_DATABASE[z]: available_districts.extend(INDIA_GEO_DATABASE[z][s])
-    sel_districts = all_selector("Select Districts", sorted(available_districts), [])
+    sel_districts = all_selector("Select Districts", sorted(available_districts))
 
     st.markdown("---")
     r_goal = st.slider("Reach Target % @ N+", 5, 95, 27)
@@ -143,38 +146,32 @@ st.markdown('<p style="font-size:2.8rem; font-weight:900; color:white;">VIRTUAL 
 if execute:
     freq, r1_perc, sov_val, d_ecpm = calculate_media_physics(r_goal, n_eff, weeks, m_type)
     
-    # UNIVERSE CALCULATION
-    TRAI_IAMAI_BASE = 950000000 
-    market_factor = 0.48 if m_type == "Urban" else 0.52 if m_type == "Rural" else 1.0
-    demo_factor = (len(sel_age)/4) * (len(sel_nccs)/5) * (0.5 if sel_gender != "Both" else 1.0)
+    # UNIVERSE LOGIC
+    TRAI_BASE = 950000000 
+    m_factor = 0.48 if m_type == "Urban" else 0.52 if m_type == "Rural" else 1.0
+    d_factor = (len(sel_age)/4) * (len(sel_nccs)/5) * (0.5 if sel_gender != "Both" else 1.0)
     
-    # Source attribution
-    source_ref = "TRAI & IAMAI 2026"
-    total_dists_in_india = sum(len(dists) for s in INDIA_GEO_DATABASE.values() for dists in s.values())
+    total_dists = sum(len(dists) for s in INDIA_GEO_DATABASE.values() for dists in s.values())
+    g_factor = len(sel_districts)/total_dists if sel_districts else len(sel_states)/28 if sel_states else 1.0
     
-    if sel_districts:
-        source_ref = "Meta Audience Insights (District Level)"
-        geo_factor = len(sel_districts) / total_dists_in_india
-    elif sel_states:
-        source_ref = "Meta Audience Insights (State Level)"
-        geo_factor = len(sel_states) / 28
-    else:
-        geo_factor = 1.0
+    source = "TRAI & IAMAI 2026"
+    if sel_districts or sel_states:
+        source = "Meta Audience Insights Overrides"
+        g_factor *= 0.85
 
-    universe = int(TRAI_IAMAI_BASE * market_factor * demo_factor * geo_factor * 0.72)
+    universe = int(TRAI_BASE * m_factor * d_factor * g_factor * 0.75)
     reached_heads = int(universe * (r1_perc / 100))
     total_imps = int(reached_heads * freq)
-    total_budget = (total_imps / 1000) * d_ecpm
+    budget = (total_imps / 1000) * d_ecpm
 
     # OUTPUTS
     st.markdown('<div class="section-header">AUDIENCE & INTENSITY</div>', unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
-    with c1: st.markdown(f'''<div class="metric-card"><div class="label">1. Addressable Universe</div><div class="value">{universe:,}</div><div class="sub-value">{m_type} | {sel_gender} | Ages: {", ".join(sel_age)}</div><div class="source-text">Source: {source_ref}</div></div>''', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="metric-card"><div class="label">2. 1+ Reach Required</div><div class="value">{r1_perc}%</div><div class="sub-value">Decay Adjusted for {weeks} Weeks</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="metric-card"><div class="label">3. Frequency (1+)</div><div class="value">{freq}</div><div class="sub-value">Required for {r_goal}% @ {n_eff}+</div></div>', unsafe_allow_html=True)
+    with c1: st.markdown(f'<div class="metric-card"><div class="label">1. Addressable Universe</div><div class="value">{universe:,}</div><div class="sub-value">{m_type} | {sel_gender} | Ages: {", ".join(sel_age)}</div><div class="source-text">Source: {source}</div></div>', unsafe_allow_html=True)
+    with c2: st.markdown(f'<div class="metric-card"><div class="label">2. 1+ Reach Required</div><div class="value">{r1_perc}%</div><div class="sub-value">Accumulated over {weeks} Weeks</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="metric-card"><div class="label">3. Frequency (1+)</div><div class="value">{freq}</div><div class="sub-value">Exposures to hit {r_goal}% @ {n_eff}+</div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-header">DELIVERY & INVESTMENT</div>', unsafe_allow_html=True)
     c4, c5, c6 = st.columns(3)
-    with c4: st.markdown(f'<div class="metric-card"><div class="label">4. Impressions</div><div class="value">{total_imps:,}</div><div class="sub-value">Gross delivery</div></div>', unsafe_allow_html=True)
-    with c5: st.markdown(f'<div class="metric-card"><div class="label">5. Total Budget</div><div class="value">₹{int(total_budget):,}</div><div class="sub-value">Estimated Gross Media Buy</div></div>', unsafe_allow_html=True)
-    with c6: st.markdown(f'<div class="metric-card"><div class="label">6. eCPM</div><div class="value">₹{d_ecpm}</div><div class="sub-value">Market Intensity Rate</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="metric-card"><div class="label">4. Impressions</div><div class="value">{total_imps:,}</div><div class="sub-value">Gross delivery for duration</div></div>', unsafe_allow_html=True)
+    with c5: st.markdown(f'<div class="metric-card"><div class="label">5. Total Budget</div><div class="value">₹{int(budget):,}</div><div class
