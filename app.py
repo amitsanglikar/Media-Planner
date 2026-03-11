@@ -107,17 +107,19 @@ def calculate_breakthrough_physics(reach_goal_n, n_plus, weeks, market_choice):
         capacity, base_ecpm = 47.5, 140
 
     l_raw = 0
-    for l in np.arange(0.1, 400.0, 0.1):
+    # Solve for Poisson Lambda
+    for l in np.arange(0.1, 500.0, 0.1):
         if (stats.poisson.sf(n_plus - 1, l)) * 100 >= reach_goal_n:
             l_raw = l
             break
     
-    # 1.8x multiplier for realistic digital intensity in 2026
-    l_impact = l_raw * 1.8 
+    # 2.0x Dynamic Friction Multiplier (Market Noise & Fragmented Reach Adjustment)
+    l_impact = l_raw * 2.0 
     
-    if l_impact < 12: f_tier, f_color = "Forgettable", "#64748B"
-    elif 12 <= l_impact < 24: f_tier, f_color = "Challenger", "#94a3b8"
-    elif 24 <= l_impact <= 35: f_tier, f_color = "Sweet Spot", "#00f2ff"
+    # Breakthrough Status Mapping
+    if l_impact < 15: f_tier, f_color = "Forgettable", "#64748B"
+    elif 15 <= l_impact < 28: f_tier, f_color = "Challenger", "#94a3b8"
+    elif 28 <= l_impact <= 42: f_tier, f_color = "Sweet Spot", "#00f2ff"
     else: f_tier, f_color = "Dominant", "#bc13fe"
     
     reach_1p = (1 - math.exp(-l_impact)) * 100
@@ -170,7 +172,6 @@ def get_label(text, info):
 if execute:
     freq, f_tier, f_color, r1_perc, sov_val, d_ecpm = calculate_breakthrough_physics(r_goal, n_eff, weeks, m_type)
     
-    # --- ADDRESSABLE UNIVERSE MATH ---
     TOTAL_PENETRATION = 950000000 
     ADDRESSABLE_RATIO = 0.72 
     
@@ -182,11 +183,7 @@ if execute:
     age_weight = len(sel_age) / 4
     gender_weight = 0.5 if sel_gender != "Both" else 1.0
     
-    total_dist_in_db = 0
-    for z in INDIA_GEO_DATABASE:
-        for s in INDIA_GEO_DATABASE[z]:
-            total_dist_in_db += len(INDIA_GEO_DATABASE[z][s])
-    
+    total_dist_in_db = sum(len(districts) for states in INDIA_GEO_DATABASE.values() for districts in states.values())
     current_dist_count = len(sel_districts) if sel_districts else (len(available_districts) if sel_states else total_dist_in_db)
     geo_multiplier = current_dist_count / total_dist_in_db
     
@@ -196,49 +193,47 @@ if execute:
     est_budget = (total_imps / 1000) * d_ecpm
 
     st.markdown('<div class="section-header">CORE IMPACT METRICS</div>', unsafe_allow_html=True)
-    c1_2, c3, c4 = st.columns([2, 1, 1])
+    c1, c2, c3 = st.columns(3)
     
-    with c1_2: 
+    with c1: 
         st.markdown(f'''
             <div class="metric-card">
-                {get_label("Addressable Universe", "Buyable persona active on ad-supported digital platforms.")}
-                <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-                    <div><div class="value">{universe:,}</div><div class="sub-value">Target Universe</div></div>
-                    <div style="text-align: right; border-left: 1px solid #00f2ff33; padding-left: 20px;">
-                        <div class="value" style="color:#00f2ff;">{r1_perc}%</div><div class="sub-value">{r1_abs:,} Reached</div>
-                    </div>
-                </div>
+                {get_label("Addressable Universe", "Filtered Persona Reachable via Digital Advertising.")}
+                <div class="value">{universe:,}</div>
+                <div class="sub-value">Target Universe Size</div>
             </div>''', unsafe_allow_html=True)
 
-    with c3: st.markdown(f'''
-        <div class="metric-card">
-            {get_label("Actual Frequency", "Avg impressions per unique head.")}
-            <div class="value">{freq}</div>
-            <div class="sub-value">Plan Intensity Index</div>
-        </div>''', unsafe_allow_html=True)
+    with c2: 
+        st.markdown(f'''
+            <div class="metric-card">
+                {get_label("Actual Frequency", "The average number of impressions required per reached user to ensure the N+ goal is hit.")}
+                <div class="value">{freq}</div>
+                <div class="sub-value">Plan Intensity (2.0x Friction)</div>
+            </div>''', unsafe_allow_html=True)
         
-    with c4: st.markdown(f'''
-        <div class="metric-card">
-            {get_label("Total Budget", "Investment for the chosen Breakthrough status.")}
-            <div class="value">₹{int(est_budget):,}</div><div class="sub-value">at ₹{d_ecpm} eCPM</div>
-        </div>''', unsafe_allow_html=True)
+    with c3: 
+        st.markdown(f'''
+            <div class="metric-card">
+                {get_label("Total Budget", "Investment for the chosen Breakthrough status.")}
+                <div class="value">₹{int(est_budget):,}</div>
+                <div class="sub-value">Gross Buy Cost</div>
+            </div>''', unsafe_allow_html=True)
 
-    st.markdown('<div class="section-header">EFFICIENCY & PENETRATION</div>', unsafe_allow_html=True)
-    b1, b2, b3, b4 = st.columns(4)
-    with b1: st.markdown(f'<div class="metric-card">{get_label("Cost / Person", "Cost per unique reached user.")}<div class="value">₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}</div></div>', unsafe_allow_html=True)
-    with b2: st.markdown(f'<div class="metric-card">{get_label("eCPM", "Effective cost per 1000 impressions.")}<div class="value">₹{d_ecpm}</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">MARKET BREAKTHROUGH</div>', unsafe_allow_html=True)
+    b1, b2 = st.columns(2)
     
-    with b3: 
+    with b1: 
+        st.markdown(f'<div class="metric-card">{get_label("eCPM", "Effective cost per 1000 impressions.")}<div class="value">₹{d_ecpm}</div><div class="sub-value">Market Rate</div></div>', unsafe_allow_html=True)
+    
+    with b2: 
         bench = "Market Leader" if sov_val > 25 else "Competitive" if sov_val > 15 else "Emerging"
         st.markdown(f'''
             <div class="metric-card-impact" style="border-left: 5px solid {f_color};">
-                {get_label("Market Shout", "SOV Benchmark.")}
+                {get_label("Market Shout", "SOV Benchmark: Your share of total available ad-load capacity.")}
                 <div class="value" style="color:{f_color};">{sov_val}%</div>
                 <div class="status-badge" style="background:{f_color}">{f_tier}</div>
                 <div class="sub-value">{bench} Pace</div>
             </div>''', unsafe_allow_html=True)
-            
-    with b4: st.markdown(f'<div class="metric-card">{get_label("Total Views", "Gross Impressions.")}<div class="value">{total_imps:,}</div></div>', unsafe_allow_html=True)
 
     
 
