@@ -216,28 +216,41 @@ if execute:
             </div>''', unsafe_allow_html=True)
 
     with c3: st.markdown(f'''
-        <div class="metric-card-impact" style="border-left: 5px solid {f_color};">
-            {get_label("Actual Frequency / SOV Status", "The Breakthrough status shows if your brand will be remembered amidst market clutter.")}
-            <div class="value" style="color:{f_color};">{freq}</div>
-            <div class="status-badge" style="background:{f_color}">{f_tier}</div>
-            <div class="sub-value">Market Intensity: {sov_val}% SOV</div>
+        <div class="metric-card">
+            {get_label("Actual Frequency", "Avg impressions per unique reached user. Factors in 1.3x wastage.")}
+            <div class="value">{freq}</div>
+            <div class="sub-value">Impact Multiplier: {round(freq/n_eff, 2)}x N+</div>
         </div>''', unsafe_allow_html=True)
         
     with c4: st.markdown(f'''
         <div class="metric-card">
-            {get_label("Total Budget", "Total buy required at current market rates to achieve this specific Breakthrough Status.")}
+            {get_label("Total Budget", "Total buy required at current market rates to achieve this specific SOV.")}
             <div class="value">₹{int(est_budget):,}</div>
             <div class="sub-value">at ₹{d_ecpm} eCPM</div>
         </div>''', unsafe_allow_html=True)
-
-    
 
     st.markdown('<div class="section-header">EFFICIENCY & PENETRATION</div>', unsafe_allow_html=True)
     b1, b2, b3, b4 = st.columns(4)
     with b1: st.markdown(f'<div class="metric-card">{get_label("Cost / Person", "Budget divided by unique people reached.")}<div class="value">₹{round(est_budget/r1_abs, 2) if r1_abs > 0 else 0}</div><div class="sub-value">Per Unique Head</div></div>', unsafe_allow_html=True)
     with b2: st.markdown(f'<div class="metric-card">{get_label("eCPM", "Effective cost per 1000 impressions based on SOV intensity.")}<div class="value">₹{d_ecpm}</div><div class="sub-value">Wholesale Rate</div></div>', unsafe_allow_html=True)
-    with b3: st.markdown(f'<div class="metric-card">{get_label("Market Shout", "Your total share of the digital conversation capacity.")}<div class="value">{sov_val}%</div><div class="sub-value">SOV %</div></div>', unsafe_allow_html=True)
+    
+    with b3: 
+        # Benchmark logic for SOV card
+        if sov_val < 15: benchmark_note = "Below Category Avg"
+        elif 15 <= sov_val <= 25: benchmark_note = "Competitive Parity"
+        else: benchmark_note = "Market Leader Pace"
+        
+        st.markdown(f'''
+            <div class="metric-card-impact" style="border-left: 5px solid {f_color};">
+                {get_label("Market Shout", f"Benchmarked against market clutter: {f_tier}. Shows your share of the digital conversation.")}
+                <div class="value" style="color:{f_color};">{sov_val}%</div>
+                <div class="status-badge" style="background:{f_color}">{f_tier}</div>
+                <div class="sub-value">{benchmark_note}</div>
+            </div>''', unsafe_allow_html=True)
+            
     with b4: st.markdown(f'<div class="metric-card">{get_label("Total Views", "Total ad displays across the chosen weeks.")}<div class="value">{total_imps:,}</div><div class="sub-value">Gross Impressions</div></div>', unsafe_allow_html=True)
+
+    
 
     st.markdown('<div class="section-header">AI STRATEGIC PLACEMENT (PREDICTED)</div>', unsafe_allow_html=True)
     try:
