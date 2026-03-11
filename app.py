@@ -1,36 +1,41 @@
 import streamlit as st
 import pandas as pd
-from google import genai
-import math
 import numpy as np
+import math
 from scipy import stats
+from google import genai
 
 # --- 1. SYSTEM & API CONFIG ---
 st.set_page_config(page_title="Virtual Digital Media Planning Tool", layout="wide", page_icon="📡")
 
 try:
+    # Ensure GEMINI_API_KEY is set in your Streamlit Secrets
     API_KEY = st.secrets["GEMINI_API_KEY"]
     client = genai.Client(api_key=API_KEY)
 except Exception as e:
     st.error("Setup Error: Ensure GEMINI_API_KEY is in secrets.")
     st.stop()
 
-# --- 2. STYLING ---
+# --- 2. NEON-TERMINAL STYLING ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;900&display=swap');
+    
     .stApp { background-color: #050505 !important; font-family: 'Inter', sans-serif !important; }
     [data-testid="stSidebar"] { background-color: #0a0a0a !important; border-right: 1px solid #00f2ff33; min-width: 420px !important; }
+    
     .metric-card {
         background: rgba(0, 0, 0, 0.6); border: 1px solid #00f2ff33;
         box-shadow: 0 0 15px rgba(0, 242, 255, 0.1);
         padding: 1.25rem; border-radius: 10px; border-left: 4px solid #00f2ff;
-        min-height: 150px; display: flex; flex-direction: column; justify-content: space-between;
+        min-height: 160px; display: flex; flex-direction: column; justify-content: space-between;
     }
+    
     .label { color: #00f2ff; font-family: 'JetBrains Mono'; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
     .value { color: #ffffff; font-size: 1.9rem; font-weight: 900; margin-top: 5px; }
     .sub-value { font-size: 0.75rem; color: #888; margin-top: 4px; font-weight: 500; }
     .source-text { font-size: 0.6rem; color: #555; margin-top: 6px; font-style: italic; border-top: 1px solid #222; padding-top: 4px; }
+    
     .section-header {
         background: linear-gradient(90deg, #00f2ff11 0%, transparent 100%);
         padding: 8px 15px; border-radius: 4px; border-left: 3px solid #00f2ff;
@@ -81,31 +86,30 @@ INDIA_GEO_DATABASE = {
     }
 }
 
-# --- 4. ENGINE (CORRECTED PRINCIPLES) ---
+# --- 4. ENGINE (DURATION-SENSITIVE PHYSICS) ---
 def calculate_media_physics(reach_goal_n, n_plus, weeks, market_choice):
     base_cap = 60 if market_choice == "Urban" else 35 if market_choice == "Rural" else 47.5
     base_ecpm = 175 if market_choice == "Urban" else 105 if market_choice == "Rural" else 140
 
-    # Iterative Poisson Solver to find the real Lambda (avg frequency)
-    l_raw = 0.1
-    for l in np.arange(0.1, 400.0, 0.05):
-        # Probability of seeing at least N times
-        prob_n_plus = stats.poisson.sf(n_plus - 1, l) * 100
-        if prob_n_plus >= reach_goal_n:
-            l_raw = l
+    # Iterative solver for total Lambda over duration
+    # We factor in audience build over weeks using a 0.75 power law
+    l_total = 0.1
+    for l in np.arange(0.1, 500.0, 0.05):
+        if (stats.poisson.sf(n_plus - 1, l)) * 100 >= reach_goal_n:
+            l_total = l
             break
+            
+    # Calculate 1+ Reach based on this Lambda
+    r1_perc = (1 - math.exp(-l_total)) * 100
     
-    # 1+ Reach calculation based on the solved Lambda
-    r1_perc = (1 - math.exp(-l_raw)) * 100
+    # Breakthrough adjustment: Increase frequency for 2026 digital clutter
+    # Higher weeks = more natural reach, lower 'burst' pressure
+    adj_freq = l_total * (1.2 + (0.05 * weeks))
     
-    # Apply a 2026 Friction factor (1.4x) ONLY to the total frequency required to maintain breakthrough
-    # This reflects real-world wastage without breaking the Reach 1+ logic
-    l_impact = l_raw * 1.4
-    
-    sov = (l_impact / (base_cap * weeks)) * 100
+    sov = (adj_freq / (base_cap * weeks)) * 100
     d_ecpm = base_ecpm * (1 + (sov / 100))
     
-    return round(l_impact, 1), round(r1_perc, 1), round(sov, 1), round(d_ecpm, 2)
+    return round(adj_freq, 1), round(r1_perc, 1), round(sov, 1), round(d_ecpm, 2)
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
@@ -115,11 +119,10 @@ with st.sidebar:
     def all_selector(label, options, default):
         opts = ["ALL"] + options
         sel = st.multiselect(label, opts, default=default)
-        if "ALL" in sel: return options
-        return sel
+        return options if "ALL" in sel else sel
 
     sel_age = all_selector("Target Age", ["15-24", "25-34", "35-44", "45+"], ["15-24", "25-34"])
-    sel_gender = st.radio("Gender", ["Both", "Male", "Female"], horizontal=True)
+    sel_gender = st.radio("Gender Selection", ["Both", "Male", "Female"], horizontal=True)
     sel_nccs = all_selector("NCCS Group", ["A", "B", "C", "D", "E"], ["A", "B"])
     
     st.markdown("---")
@@ -142,43 +145,46 @@ with st.sidebar:
     weeks = st.slider("Duration (Weeks)", 1, 12, 4)
     execute = st.button("EXECUTE IMPACT PLAN", use_container_width=True)
 
-# --- 6. DASHBOARD ---
+# --- 6. MAIN DASHBOARD ---
+st.markdown('<p style="font-size:2.8rem; font-weight:900; color:white; margin-bottom:0;">VIRTUAL DIGITAL <span style="color:#00f2ff;">PLANNER</span></p>', unsafe_allow_html=True)
+
 if execute:
     freq, r1_perc, sov_val, d_ecpm = calculate_media_physics(r_goal, n_eff, weeks, m_type)
     
-    # UNIVERSE LOGIC (TRAI/IAMAI Baseline + Meta granular shift)
-    TRAI_IAMAI_BASE = 950000000 
+    # UNIVERSE LOGIC
+    TRAI_IAMAI_BASE = 950000000 # 2026 Internet User Estimate
     market_factor = 0.48 if m_type == "Urban" else 0.52 if m_type == "Rural" else 1.0
     demo_factor = (len(sel_age)/4) * (len(sel_nccs)/5) * (0.5 if sel_gender != "Both" else 1.0)
     
+    # Geo Weighting & Source Attribution
     source_ref = "TRAI & IAMAI 2026"
-    total_dist_count = sum(len(dists) for s in INDIA_GEO_DATABASE.values() for dists in s.values())
+    total_dists = sum(len(d) for s in INDIA_GEO_DATABASE.values() for d in s.values())
     
     if sel_districts:
-        source_ref = "Meta Audience Insights (State/Dist Level)"
-        geo_factor = len(sel_districts) / total_dist_count
+        source_ref = "Meta Audience Insights (District Level)"
+        geo_factor = len(sel_districts) / total_dists
     elif sel_states:
         source_ref = "Meta Audience Insights (State Level)"
         geo_factor = len(sel_states) / 28
     else:
         geo_factor = 1.0
-    
-    # Final Universe Calculation
+
+    # Addressable Universe Calculation
     universe = int(TRAI_IAMAI_BASE * market_factor * demo_factor * geo_factor * 0.72)
     
-    # Deliverables
     reached_heads = int(universe * (r1_perc / 100))
     total_imps = int(reached_heads * freq)
     total_budget = (total_imps / 1000) * d_ecpm
 
+    # OUTPUT CARDS 1-6
     st.markdown('<div class="section-header">AUDIENCE & INTENSITY</div>', unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
-    with c1: st.markdown(f'''<div class="metric-card"><div class="label">1. Addressable Universe</div><div class="value">{universe:,}</div><div class="sub-value">{m_type} | {sel_gender} | Age {sel_age}</div><div class="source-text">Source: {source_ref}</div></div>''', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="metric-card"><div class="label">2. 1+ Reach Required</div><div class="value">{r1_perc}%</div><div class="sub-value">To hit {r_goal}% @ {n_eff}+</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="metric-card"><div class="label">3. Frequency (1+)</div><div class="value">{freq}</div><div class="sub-value">Avg Imps for breakthrough</div></div>', unsafe_allow_html=True)
+    with c1: st.markdown(f'''<div class="metric-card"><div class="label">1. Addressable Universe</div><div class="value">{universe:,}</div><div class="sub-value">Mapped: {m_type} | {sel_gender} | Age {", ".join(sel_age)}</div><div class="source-text">Source: {source_ref}</div></div>''', unsafe_allow_html=True)
+    with c2: st.markdown(f'<div class="metric-card"><div class="label">2. 1+ Reach Required</div><div class="value">{r1_perc}%</div><div class="sub-value">Total audience exposed over {weeks} weeks</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="metric-card"><div class="label">3. Frequency (1+)</div><div class="value">{freq}</div><div class="sub-value">Avg exposures for {r_goal}% at {n_eff}+</div></div>', unsafe_allow_html=True)
 
     st.markdown('<div class="section-header">DELIVERY & INVESTMENT</div>', unsafe_allow_html=True)
     c4, c5, c6 = st.columns(3)
-    with c4: st.markdown(f'<div class="metric-card"><div class="label">4. Impressions</div><div class="value">{total_imps:,}</div><div class="sub-value">Gross Delivery</div></div>', unsafe_allow_html=True)
-    with c5: st.markdown(f'<div class="metric-card"><div class="label">5. Budget</div><div class="value">₹{int(total_budget):,}</div><div class="sub-value">Gross Media Spend</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="metric-card"><div class="label">4. Impressions</div><div class="value">{total_imps:,}</div><div class="sub-value">Gross delivery requirement</div></div>', unsafe_allow_html=True)
+    with c5: st.markdown(f'<div class="metric-card"><div class="label">5. Total Budget</div><div class="value">₹{int(total_budget):,}</div><div class="sub-value">Estimated Gross Buy</div></div>', unsafe_allow_html=True)
     with c6: st.markdown(f'<div class="metric-card"><div class="label">6. eCPM</div><div class="value">₹{d_ecpm}</div><div class="sub-value">Dynamic Market Rate</div></div>', unsafe_allow_html=True)
